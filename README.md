@@ -1,6 +1,5 @@
 # Sheet Music Reader
 Final Project for CSCI437
-## Requirement
 
 ## Dependencies
 *requirements.txt* contains all necessary libraries.
