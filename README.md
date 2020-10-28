@@ -3,7 +3,7 @@ Final Project for CSCI437
 
 ## Structure
 - *music_reader.py* is the main file of the program.
-- Images and Videos are stored in the *media* folder.
+- Images of sheet music are stored in the *music-img* folder.
 
 ## Dependencies
 *requirements.txt* contains all necessary libraries.
