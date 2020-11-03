@@ -3,6 +3,7 @@ Final Project for CSCI437
 
 ## Structure
 - *music_reader.py* is the main file of the program.
+- *music_playback.py* is used to play the audio of the sheet music
 - Images of sheet music are stored in the *music-img* folder.
 
 ## Dependencies
