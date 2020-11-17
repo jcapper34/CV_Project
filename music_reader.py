@@ -11,6 +11,7 @@ def music_reader(filename):
 
     detect_staff_lines(gray_img)
 
+
 if __name__ == '__main__':
-    filename = os.path.join(MEDIA_DIR, 'fireflies.jpg')
+    filename = os.path.join(MEDIA_DIR, 'hot-cross-buns.png')
     music_reader(filename)
