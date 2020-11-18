@@ -1,9 +1,10 @@
 import cv2
+import os
 import numpy as np
+from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 
-def detect_staff_lines(gray_img):
-    _, binary_img = cv2.threshold(gray_img, 200, 255, cv2.THRESH_BINARY)
+def detect_staff_lines(binary_img):
 
     staff_img = np.full(binary_img.shape, 255, np.uint8)
 
@@ -43,3 +44,19 @@ def detect_staff_lines(gray_img):
     cv2.imshow("Staff Image", staff_img)
     cv2.waitKey(0)
 
+
+def detect_clef(bgr_img):
+    treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
+
+    c = cv2.matchTemplate(bgr_img, treble_template, cv2.TM_CCOEFF_NORMED)
+
+    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(c)
+    x, y = max_loc
+
+    threshold = 0.1
+    if max_val > threshold:  # Only draw if there's a point that meets the threshold
+        cv2.rectangle(bgr_img, (x, y), (x + 20, y + 20), (0, 0, 255),
+                      2)  # Draw Rectangle from top left corner
+
+    cv2.imshow("Template match", treble_template)
+    cv2.waitKey(0)
