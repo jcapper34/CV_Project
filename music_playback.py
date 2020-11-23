@@ -53,13 +53,10 @@ def play_notes(notes):
         # Ensure that highest value is in 16-bit range
         note_audio = note * (2**15 - 1) / np.max(np.abs(note))
 
-        # Convert to 16-bit data
-        note_audio = note_audio.astype(np.int16)
-
-        audio = np.append(audio, note_audio, axis=0)    # Add note to buffer
+        audio = np.append(audio, note_audio.astype(np.int16), axis=0)    # Add note to buffer
 
         stop_counts = np.repeat(0, NOTE_STOP*SAMPLE_RATE)     # Add note stop time to buffer
-        audio = np.append(audio, stop_counts, axis=0)
+        audio = np.append(audio, stop_counts.astype(np.int16), axis=0)
 
     # Start playback
     play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
