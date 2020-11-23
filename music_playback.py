@@ -6,7 +6,7 @@ import numpy as np
 import simpleaudio as sa
 
 SAMPLE_RATE = 44100
-QUARTER_DURATION = 0.4     # Duration of quarter note (sec)
+QUARTER_DURATION = 0.6     # Duration of quarter note (sec)
 NOTE_STOP = 0.01            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
@@ -94,10 +94,21 @@ if __name__ == '__main__':
         [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
         [('E', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
         [('E', 5, None, QUARTER_DURATION*2), [('C', 4, None, QUARTER_DURATION), ('D', 4, None, QUARTER_DURATION)]],
-        [('D', 5, None, QUARTER_DURATION)],
-        [('D', 5, None, QUARTER_DURATION)],
-        [('D', 5, None, QUARTER_DURATION*2)],
-        [('E', 5, None, QUARTER_DURATION)],
-        [('G', 5, None, QUARTER_DURATION)],
-        [('G', 5, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION), ('G', 3, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION), ('B', 3, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION*2), [('D', 4, None, QUARTER_DURATION), ('B', 3, None, QUARTER_DURATION)]],
+        [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
+        [('G', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
+        [('G', 5, None, QUARTER_DURATION*2), [('G', 4, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)]],
     ])
+
+    # # All Along the Watchtower
+    # # Sharps are C, D, F, G
+    # play_notes([
+    #     [('F', 5, '#', QUARTER_DURATION/2), ('D', 5, '#', QUARTER_DURATION/2), ('B', 3, None, QUARTER_DURATION/2)],
+    #     [('F', 5, '#', QUARTER_DURATION/2), ('D', 5, '#', QUARTER_DURATION/2), ('B', 3, None, QUARTER_DURATION/2)],
+    #     [('G', 5, '#', QUARTER_DURATION/2), ('E', 5, None, QUARTER_DURATION/2), ('C', 3, '#', QUARTER_DURATION/2)],
+    #     [('G', 5, '#', QUARTER_DURATION/2), ('E', 5, None, QUARTER_DURATION/2), ('C', 3, '#', QUARTER_DURATION/2)],
+    #     [('G', 5, '#', QUARTER_DURATION/2), ('E', 5, None, QUARTER_DURATION/2), ('C', 3, '#', QUARTER_DURATION/2)],
+    #     [('G', 5, '#', QUARTER_DURATION), ('E', 5, None, QUARTER_DURATION), ('C', 3, '#', QUARTER_DURATION)],
+    # ])
