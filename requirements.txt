@@ -5,3 +5,6 @@ mkl-service==2.3.0
 numpy @ file:///C:/ci/numpy_and_numpy_base_1603466732592/work
 six==1.15.0
 wincertstore==0.2
+
+numpy~=1.19.2
+simpleaudio~=1.0.4
