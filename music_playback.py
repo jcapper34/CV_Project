@@ -6,8 +6,8 @@ import numpy as np
 import simpleaudio as sa
 
 SAMPLE_RATE = 44100
-QUARTER_DURATION = 0.25
-NOTE_STOP = 0.01
+QUARTER_DURATION = 0.4     # Duration of quarter note (sec)
+NOTE_STOP = 0.01            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
     "C":   [16.35, 32.70, 65.41, 130.81, 261.63, 523.25, 1046.50, 2093.00, 4186.01],
@@ -38,25 +38,46 @@ def get_frequency(letter, octave, accidental):
     return NOTE_FREQUENCIES[letter][octave]
 
 
-
+"""
+Takes in a sequence of note groups.
+-> Each note group contains a list of notes to be played at that time
+-> -> Each note is represented by a tuple in the form (letter, octave, accidental, duration)
+-> -> Exception: if the note is a rest, then it is just be represented by the duration value
+-> -> -> Accidental should be '#' for sharp, 'b' for flat, and None if no accidental
+"""
 def play_notes(notes):
     audio = np.array([], dtype=np.int16)
-    for note in notes:
-        letter, octave, accidental, duration = note
-        frequency = get_frequency(letter, octave, accidental)
+    for note_group in notes:
+        note_group = note_group if isinstance(note_group, list) else [note_group]  # Make sure it's a list
 
-        t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
+        note_wave = 0
+        for part in note_group:
+            part = part if isinstance(part, list) else [part]   # Make sure it's a list
+            part_wave = np.array([])
+            for note in part:
+                if isinstance(note, tuple):
+                    letter, octave, accidental, duration = note
+                    frequency = get_frequency(letter, octave, accidental)
 
-        # Sine wave of note frequency
-        note = np.sin(frequency * t * 2 * np.pi)
+                    # Create sampled time range
+                    t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
 
-        # Ensure that highest value is in 16-bit range
-        note_audio = note * (2**15 - 1) / np.max(np.abs(note))
+                    # Sine wave of note frequency
+                    part_wave = np.append(part_wave, np.sin(frequency * t * 2 * np.pi), axis=0)
+
+                else: # This means it is a rest
+                    duration = note
+                    part_wave = np.append(part_wave, np.repeat(0, duration * SAMPLE_RATE), axis=0)
+
+            # Add pause time between notes
+            part_wave = np.append(part_wave, np.repeat(0, NOTE_STOP * SAMPLE_RATE), axis=0)
+
+            note_wave += part_wave
+
+        # Put everything in a 16 bit range where the max is 2^15-1
+        note_audio = note_wave * (2**15 - 1) / np.max(np.abs(note_wave))
 
         audio = np.append(audio, note_audio.astype(np.int16), axis=0)    # Add note to buffer
-
-        stop_counts = np.repeat(0, NOTE_STOP*SAMPLE_RATE)     # Add note stop time to buffer
-        audio = np.append(audio, stop_counts.astype(np.int16), axis=0)
 
     # Start playback
     play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
@@ -64,19 +85,19 @@ def play_notes(notes):
 
 
 if __name__ == '__main__':
+    # Mary Had a Little Lamb
     play_notes([
-        ('E', 4, None, QUARTER_DURATION),
-        ('D', 4, None, QUARTER_DURATION),
-        ('C', 4, None, QUARTER_DURATION),
-        ('D', 4, None, QUARTER_DURATION),
-        ('E', 4, None, QUARTER_DURATION),
-        ('E', 4, None, QUARTER_DURATION),
-        ('E', 4, None, QUARTER_DURATION*2),
-        ('D', 4, None, QUARTER_DURATION),
-        ('D', 4, None, QUARTER_DURATION),
-        ('D', 4, None, QUARTER_DURATION*2),
-        ('E', 4, None, QUARTER_DURATION),
-        ('G', 4, None, QUARTER_DURATION),
-        ('G', 4, None, QUARTER_DURATION),
-
+        [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
+        [('C', 5, None, QUARTER_DURATION), ('G', 4, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
+        [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
+        [('E', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
+        [('E', 5, None, QUARTER_DURATION*2), [('C', 4, None, QUARTER_DURATION), ('D', 4, None, QUARTER_DURATION)]],
+        [('D', 5, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION)],
+        [('D', 5, None, QUARTER_DURATION*2)],
+        [('E', 5, None, QUARTER_DURATION)],
+        [('G', 5, None, QUARTER_DURATION)],
+        [('G', 5, None, QUARTER_DURATION)],
     ])
