@@ -6,6 +6,8 @@ import numpy as np
 import simpleaudio as sa
 
 SAMPLE_RATE = 44100
+QUARTER_DURATION = 0.25
+NOTE_STOP = 0.01
 
 NOTE_FREQUENCIES = {
     "C":   [16.35, 32.70, 65.41, 130.81, 261.63, 523.25, 1046.50, 2093.00, 4186.01],
@@ -38,31 +40,46 @@ def get_frequency(letter, octave, accidental):
 
 
 def play_notes(notes):
+    audio = np.array([], dtype=np.int16)
     for note in notes:
         letter, octave, accidental, duration = note
         frequency = get_frequency(letter, octave, accidental)
-        print(frequency)
-        # break
 
-        t = np.linspace(0, duration, duration * SAMPLE_RATE, False)
+        t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
 
         # Sine wave of note frequency
         note = np.sin(frequency * t * 2 * np.pi)
 
         # Ensure that highest value is in 16-bit range
-        audio = note * (2 ** 15 - 1) / np.max(np.abs(note))
+        note_audio = note * (2**15 - 1) / np.max(np.abs(note))
 
         # Convert to 16-bit data
-        audio = audio.astype(np.int16)
+        note_audio = note_audio.astype(np.int16)
 
-        # Start playback
-        play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
-        play_obj.wait_done()
+        audio = np.append(audio, note_audio, axis=0)    # Add note to buffer
+
+        stop_counts = np.repeat(0, NOTE_STOP*SAMPLE_RATE)     # Add note stop time to buffer
+        audio = np.append(audio, stop_counts, axis=0)
+
+    # Start playback
+    play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
+    play_obj.wait_done()
 
 
 if __name__ == '__main__':
     play_notes([
-        ('A', 4, '#', 1),
-        ('B', 4, None, 1),
-        ('C', 4, None, 1),
+        ('E', 4, None, QUARTER_DURATION),
+        ('D', 4, None, QUARTER_DURATION),
+        ('C', 4, None, QUARTER_DURATION),
+        ('D', 4, None, QUARTER_DURATION),
+        ('E', 4, None, QUARTER_DURATION),
+        ('E', 4, None, QUARTER_DURATION),
+        ('E', 4, None, QUARTER_DURATION*2),
+        ('D', 4, None, QUARTER_DURATION),
+        ('D', 4, None, QUARTER_DURATION),
+        ('D', 4, None, QUARTER_DURATION*2),
+        ('E', 4, None, QUARTER_DURATION),
+        ('G', 4, None, QUARTER_DURATION),
+        ('G', 4, None, QUARTER_DURATION),
+
     ])
