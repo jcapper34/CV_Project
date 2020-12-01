@@ -13,9 +13,11 @@ def music_reader(filename):
 
     # detect_staff_lines(binary_img)
 
-    detect_clef(bgr_img)
+    #If the clef is a trebel clef it returns 0, else `
+    clef = detect_clef(bgr_img)
+
 
 
 if __name__ == '__main__':
-    filename = os.path.join(MEDIA_DIR, 'fireflies.jpg')
+    filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb-bass.png')
     music_reader(filename)

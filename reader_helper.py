@@ -45,18 +45,31 @@ def detect_staff_lines(binary_img):
     cv2.waitKey(0)
 
 
+#Returns int for bass or trebel clef, trebel = 0, bass = 1
 def detect_clef(bgr_img):
     treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
 
     c = cv2.matchTemplate(bgr_img, treble_template, cv2.TM_CCOEFF_NORMED)
 
-    min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(c)
+    min_val, max_val_trebel, min_loc, max_loc = cv2.minMaxLoc(c)
     x, y = max_loc
 
-    threshold = 0.1
-    if max_val > threshold:  # Only draw if there's a point that meets the threshold
+    threshold = 0.5
+    if max_val_trebel > threshold:  # Only draw if there's a point that meets the threshold
         cv2.rectangle(bgr_img, (x, y), (x + 20, y + 20), (0, 0, 255),
                       2)  # Draw Rectangle from top left corner
+    bass_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'bass-clef.jpg'))
 
-    cv2.imshow("Template match", treble_template)
-    cv2.waitKey(0)
+    c = cv2.matchTemplate(bgr_img, bass_template, cv2.TM_CCOEFF_NORMED)
+
+    min_val, max_val_bass, min_loc, max_loc = cv2.minMaxLoc(c)
+    x, y = max_loc
+
+    threshold = 0.5
+    if max_val_bass > threshold:  # Only draw if there's a point that meets the threshold
+        cv2.rectangle(bgr_img, (x, y), (x + 20, y + 20), (0, 0, 255),
+                      2)  # Draw Rectangle from top left corner
+    if(max_val_trebel > max_val_bass):
+        return 0
+    else:
+        return 1
