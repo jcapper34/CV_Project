@@ -5,14 +5,25 @@ import numpy as np
 from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 
+class Staff:
+    def __init__(self, lines):
+        self.lines = lines
+        self.clef = None
+        self.sharps = None
+        self.flats = None
+
+    def __str__(self):
+        return str(self.lines)
+
+
 def detect_staff_lines(binary_img):
     # Thresholds
     MIN_HOUGH_VOTES_FRACTION = 0.6       # threshold = min_hough_votes_fraction * image width
     MIN_LINE_LENGTH_FRACTION = 0.4      # image_width * min_line_length
     MAX_LINE_GAP = 40
     MAX_LINE_ANGLE = 1.0    # Degrees
+    LINE_SPACE_VARIATION = 1
 
-    lines_img = np.full(binary_img.shape, 255, np.uint8)
 
     # Find lines with houghLinesP
     image_width = binary_img.shape[1]
@@ -26,6 +37,8 @@ def detect_staff_lines(binary_img):
         minLineLength=int(image_width * MIN_LINE_LENGTH_FRACTION),
         maxLineGap=MAX_LINE_GAP)
 
+    lines_img = np.full(binary_img.shape, 255, np.uint8)
+
     # Filter out lines that arent horizontal
     filtered_lines = []
     for line in lines:
@@ -35,12 +48,30 @@ def detect_staff_lines(binary_img):
             filtered_lines.append([x1, y1, x2, y2])
             cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0), thickness=1)
 
+    filtered_lines.sort(key=lambda x: x[1])     # Sort lines top to bottom
+
+    # Group lines into staffs
+    staffs = []
+    i = 0
+    while i < len(filtered_lines)-1:
+        start_i = i
+        spacing = filtered_lines[i+1][1] - filtered_lines[i][1]
+        while filtered_lines[i+1][1] - filtered_lines[i][1] in range(spacing-LINE_SPACE_VARIATION, spacing+LINE_SPACE_VARIATION+1): # If spacing is about equal
+            i += 1
+            if i+1 >= len(filtered_lines):
+                break
+        num_spacings = i - start_i
+
+        assert num_spacings == 4 or num_spacings == 1, "Staff Lines Detected Incorrectly"
+
+        if num_spacings == 4:
+            staffs.append(Staff(filtered_lines[start_i: i+1]))
+
+    assert len(staffs) % 2 == 0, "Must have an even number of staffs"
 
     cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
     cv2.waitKey(0)
 
-    # TODO return a set of the hough lines whose y is in seen_lines
-    # figure out best way to store these ^ so we can scan across lines, check y's of notes relative to lines
 
 
 #Returns int for bass or trebel clef, trebel = 0, bass = 1

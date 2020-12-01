@@ -19,5 +19,5 @@ def music_reader(filename):
 
 
 if __name__ == '__main__':
-    filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb-bass.png')
+    filename = os.path.join(MEDIA_DIR, 'fireflies.jpg')
     music_reader(filename)
