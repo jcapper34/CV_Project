@@ -6,75 +6,37 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 
 def detect_staff_lines(binary_img):
+    # Thresholds
+    MIN_HOUGH_VOTES_FRACTION = 0.6       # threshold = min_hough_votes_fraction * image width
+    MIN_LINE_LENGTH_FRACTION = 0.4      # image_width * min_line_length
+    MAX_LINE_GAP = 40
+    MAX_LINE_ANGLE = 1.0    # Degrees
 
     lines_img = np.full(binary_img.shape, 255, np.uint8)
-    #
-    # for col_num, col in enumerate(binary_img.T):
-    #     black_spacings = []   # Row differences between black pixels
-    #
-    #     last_black = None   # Will have the row of the last black pixel
-    #     for row_num, pixel in enumerate(col):
-    #         if pixel == 0:   # If pixel is black
-    #             if last_black is not None:
-    #                 spacing = row_num - last_black
-    #                 if spacing != 1:
-    #                     black_spacings.append((row_num, spacing))
-    #
-    #             last_black = row_num
-    #
-    #     counter = 0
-    #     for i, pixel in enumerate(black_spacings):
-    #         row_num, spacing = pixel
-    #
-    #         if i+1 < len(black_spacings):
-    #             next_row, next_spacing = black_spacings[i+1]
-    #
-    #             if next_spacing in range(spacing-1, spacing+2): # If the next spacing is within 1 of current spacing
-    #                 counter += 1
-    #
-    #                 if counter == 3:    # If we found five straight black pixels of (nearly) equal spacing
-    #                     for r in range(row_num - 4*spacing, row_num+spacing, spacing):  # Draw those five pixels
-    #                         staff_img[r, col_num] = 0
-    #
-    #                     counter = 0
-    #
-    #             else:
-    #                 counter = 0
 
     # Find lines with houghLinesP
     image_width = binary_img.shape[1]
     inv_img = 255 - binary_img
-    MIN_HOUGH_VOTES_FRACTION = .5       # threshold = min_hough_votes_fraction * image width
-    MIN_LINE_LENGTH_FRACTION = .95      # image_width * min_line_length
-    houghLines = cv2.HoughLinesP(
+    lines = cv2.HoughLinesP(
         image=inv_img,
-        rho=10,
+        rho=1,
         theta=math.pi / 180,
         threshold=int(image_width * MIN_HOUGH_VOTES_FRACTION),
         lines=None,
         minLineLength=int(image_width * MIN_LINE_LENGTH_FRACTION),
-        maxLineGap=10)
+        maxLineGap=MAX_LINE_GAP)
 
-    # Account for same lines counted multiple times
-    seen_lines = []
-    for i in range(0, len(houghLines)):
-        seen_lines.append(houghLines[i][0][1])
+    # Filter out lines that arent horizontal
+    filtered_lines = []
+    for line in lines:
+        x1, y1, x2, y2 = line[0]
+        line_angle = np.rad2deg(np.arctan2(y2-y1, x2-x1))
+        if abs(line_angle) < MAX_LINE_ANGLE:
+            filtered_lines.append([x1, y1, x2, y2])
+            cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0), thickness=1)
 
-    for i in range(0, len(seen_lines)):
-        for j in range(i + 1, len(seen_lines)):
-            diff = abs(seen_lines[i] - seen_lines[j])
-            if(diff < 5):
-                seen_lines.pop(i)
-                break
 
-    # For visualizing the lines
-    for k in range(0, len(houghLines)):
-        if houghLines[k][0][1] in seen_lines:
-            l = houghLines[k][0]
-            cv2.line(lines_img, (l[0], l[1]), (l[2], l[3]), 0,
-                     thickness=2, lineType=cv2.LINE_AA)
-    cv2.namedWindow("Staff image", cv2.WINDOW_NORMAL)
-    cv2.imshow("Staff image", lines_img)
+    cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
     cv2.waitKey(0)
 
     # TODO return a set of the hough lines whose y is in seen_lines
