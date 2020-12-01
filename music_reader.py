@@ -11,9 +11,9 @@ def music_reader(filename):
     gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
     _, binary_img = cv2.threshold(gray_img, 200, 255, cv2.THRESH_BINARY)
 
-    # detect_staff_lines(binary_img)
+    detect_staff_lines(binary_img)
 
-    #If the clef is a trebel clef it returns 0, else `
+    #If the clef is a trebel clef it returns 0, else if it is a bass clef return 1
     clef = detect_clef(bgr_img)
 
 
