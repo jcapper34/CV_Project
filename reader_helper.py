@@ -8,16 +8,14 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 class Staff:
     def __init__(self, lines):
         self.lines = lines
-        self.clef = None
+        self.clef = None    # 0 if treble else bass if 1
         self.sharps = None
         self.flats = None
 
     def __str__(self):
-        return """
-Staff:
-    lines: %s,
-    clef: %s
-            """ % (str(self.lines), str(self.clef))
+        return ("Staff:\n" +
+        "\tlines: %s\n" +
+        "\tclef: %s") % (str(self.lines), str(self.clef))
 
 
 def detect_staff_lines(binary_img):
@@ -81,68 +79,33 @@ def detect_staff_lines(binary_img):
 
 #Returns int for bass or trebel clef, trebel = 0, bass = 1
 def detect_clefs(bgr_img, staffs):
-    C_THRESH = 0.75
+    C_THRESH = 0.6         # Template matching threshold
+    TREBLE_PADDING = 0.5   # The treble clef extends from around 50% above to 50% below the staff
 
     # Read in clef templates
     treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
     bass_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'bass-clef.jpg'))
 
-    # for staff in staffs:
-    #     subimage = bgr_img[staff.lines[0][1]:staff.lines[-1][1], staff.lines[0][0]:staff.lines[0][-2]]
-    #
-    #     cv2.imshow("Staff Image", subimage)
-    #     cv2.waitKey(0)
+    for staff in staffs:
+        staff_top = staff.lines[0][1]
+        staff_height = staff.lines[-1][1] - staff_top
+        staff_image = bgr_img[int(staff_top-TREBLE_PADDING*staff_height):int(staff_top+staff_height+TREBLE_PADDING*staff_height),
+                            staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
-    clefs = []
+        detected_clef = None
+        for clef_num, template in enumerate((treble_template, bass_template)):
+            scale = staff_image.shape[0] / template.shape[0]
+            scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template to be same height as staff
 
-    scale_start, scale_step, scale_stop = 0.1, 0.02, 2.0
+            c = cv2.matchTemplate(staff_image, scaled_template, cv2.TM_CCOEFF_NORMED)   # Get template matching scores
+            _, max_val, _, max_loc = cv2.minMaxLoc(c)
 
-    scale = scale_start
-    while scale <= scale_stop:
-        total_clefs = 0
-        found_clefs = []
-        scaled_templates = (
-            cv2.resize(treble_template, dsize=None, fx=scale, fy=scale),
-            cv2.resize(bass_template, dsize=None, fx=scale, fy=scale)
-        )
-        for scaled_template in scaled_templates:
-            c = cv2.matchTemplate(bgr_img, scaled_template, cv2.TM_CCOEFF_NORMED)
+            if max_val > C_THRESH:
+                detected_clef = clef_num
 
-            _, binary_scores_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
-            binary_scores_img = np.array(binary_scores_img, dtype=np.uint8)  # Make sure type is correct
+        staff.clef = detected_clef
 
-            # Connect the components
-            num_clefs, _, _, clef_centroids = cv2.connectedComponentsWithStats(binary_scores_img)
-
-            total_clefs += num_clefs - 1
-
-            found_clefs.append(clef_centroids[1::])
-            # for x, y in clef_centroids[1::]:  # Only draw if there's a point that meets the threshold
-            #     x, y = int(x), int(y)
-            #     temp_h, temp_w, _ = 50, 50, 0
-            #     cv2.rectangle(bgr_img, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255))
-
-        if total_clefs == len(staffs):
-            for i in range(2):
-                for x, y in found_clefs[i]:  # Only draw if there's a point that meets the threshold
-                    x, y = int(x), int(y)
-                    temp_h, temp_w, _ = scaled_templates[i].shape
-                    cv2.rectangle(bgr_img, (x, y), (x+temp_w, y+temp_h), (0,0,255))
-                    clefs.append((y, i))
-
-            break
-
-        scale += scale_step
-
-    clefs.sort(key=lambda x: x[0])  # Sort top to bottom
-
-    for i in range(len(clefs)):
-        staffs[i].clef = clefs[i][1]
-
-    cv2.imshow("Clefs", bgr_img)
-    cv2.waitKey(0)
-
-    return staffs   # Same staff array but now includes clefs
+    return staffs
 
 
 # Note detection
