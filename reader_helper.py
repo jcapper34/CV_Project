@@ -107,6 +107,29 @@ def detect_clef(bgr_img):
         return 1
 
 # Note detection
-def detect_note(bgr_img):
+def detect_notes(bgr_img): # NEEDS to take in 1 staff objects at a time, cleff
+    # TODO make note object, add note list to staff object
+    # Get length and width of staff line
+    # Crop this area in sheet music image (bgr_img), slighty larger
+
+    # Perform openings/closings until notes are largest connected components
+    # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
+    # Order components by x-coord (L -> R)
+
+    # notes = []
+    # For every component found
+        # Compare area to templates of note values      <-- NOT SURE if we are considering this (worry about the rest first)
+        # If no match, not a note
+        # Else assign note value
+
+        # Check y coord of center
+        # Compare to staff lines y-coords
+        # Based on cleff
+            # Assign note
+
+        # Add to some array
+
+
+    # Add note array in
 
     return ""
