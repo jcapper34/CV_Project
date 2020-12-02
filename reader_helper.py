@@ -15,7 +15,8 @@ class Staff:
     def __str__(self):
         return ("Staff:\n" +
         "\tlines: %s\n" +
-        "\tclef: %s") % (str(self.lines), str(self.clef))
+        "\tclef: %s") % (str(self.lines),
+                         "Treble" if self.clef == 0 else "Bass" if self.clef == 1 else 'None')
 
 
 def detect_staff_lines(binary_img):
@@ -77,19 +78,23 @@ def detect_staff_lines(binary_img):
     return staffs
 
 
-#Returns int for bass or trebel clef, trebel = 0, bass = 1
-def detect_clefs(bgr_img, staffs):
-    C_THRESH = 0.6         # Template matching threshold
+def detect_clefs(binary_img, staffs):
+    C_THRESH = 0.7        # Template matching threshold
     TREBLE_PADDING = 0.5   # The treble clef extends from around 50% above to 50% below the staff
 
-    # Read in clef templates
+    # Read in clef templates as binary images
     treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
+    treble_template = cv2.cvtColor(treble_template, cv2.COLOR_BGR2GRAY)
+    _, treble_template = cv2.threshold(treble_template, 127, 255, cv2.THRESH_BINARY)
+
     bass_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'bass-clef.jpg'))
+    bass_template = cv2.cvtColor(bass_template, cv2.COLOR_BGR2GRAY)
+    _, bass_template = cv2.threshold(bass_template, 127, 255, cv2.THRESH_BINARY)
 
     for staff in staffs:
         staff_top = staff.lines[0][1]
         staff_height = staff.lines[-1][1] - staff_top
-        staff_image = bgr_img[int(staff_top-TREBLE_PADDING*staff_height):int(staff_top+staff_height+TREBLE_PADDING*staff_height),
+        staff_image = binary_img[int(staff_top - TREBLE_PADDING * staff_height):int(staff_top + staff_height + TREBLE_PADDING * staff_height),
                             staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
         detected_clef = None
@@ -104,15 +109,17 @@ def detect_clefs(bgr_img, staffs):
                 detected_clef = clef_num
 
         staff.clef = detected_clef
+        cv2.imshow("Staff", staff_image)
+        cv2.waitKey(0)
 
     return staffs
 
 
 # Note detection
-def detect_notes(bgr_img): # NEEDS to take in 1 staff objects at a time, cleff
+def detect_notes(bgr_img): # NEEDS to take in 1 staff objects at a time, clef
     # TODO make note object, add note list to staff object
     # Get length and width of staff line
-    # Crop this area in sheet music image (bgr_img), slighty larger
+    # Crop this area in sheet music image (bgr_img), slightly larger
 
     # Perform openings/closings until notes are largest connected components
     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
