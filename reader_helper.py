@@ -69,42 +69,59 @@ def detect_staff_lines(binary_img):
 
     assert len(staffs) % 2 == 0, "Must have an even number of staffs"
 
-    cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
-    cv2.waitKey(0)
+    # cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
+    # cv2.waitKey(0)
 
+    return staffs
 
 
 #Returns int for bass or trebel clef, trebel = 0, bass = 1
-def detect_clef(bgr_img):
-    # Treble clef matching
+def detect_clefs(bgr_img, staffs):
+    C_THRESH = 0.75
+
+    # Read in clef templates
     treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
-
-    c = cv2.matchTemplate(bgr_img, treble_template, cv2.TM_CCOEFF_NORMED)
-
-    min_val, max_val_trebel, min_loc, max_loc = cv2.minMaxLoc(c)
-    x, y = max_loc
-
-    threshold = 0.5
-    if max_val_trebel > threshold:  # Only draw if there's a point that meets the threshold
-        cv2.rectangle(bgr_img, (x, y), (x + 20, y + 20), (0, 0, 255),
-                      2)  # Draw Rectangle from top left corner
-
-    # Bass clef matching
     bass_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'bass-clef.jpg'))
 
-    c = cv2.matchTemplate(bgr_img, bass_template, cv2.TM_CCOEFF_NORMED)
+    scale_start, scale_step, scale_stop = 0.1, 0.02, 2.0
 
-    min_val, max_val_bass, min_loc, max_loc = cv2.minMaxLoc(c)
-    x, y = max_loc
+    scale = scale_start
+    while scale <= scale_stop:
+        total_clefs = 0
+        found_clefs = []
+        scaled_templates = (
+            cv2.resize(treble_template, dsize=None, fx=scale, fy=scale),
+            cv2.resize(bass_template, dsize=None, fx=scale, fy=scale)
+        )
+        for scaled_template in scaled_templates:
+            c = cv2.matchTemplate(bgr_img, scaled_template, cv2.TM_CCOEFF_NORMED)
 
-    threshold = 0.5
-    if max_val_bass > threshold:  # Only draw if there's a point that meets the threshold
-        cv2.rectangle(bgr_img, (x, y), (x + 20, y + 20), (0, 0, 255),
-                      2)  # Draw Rectangle from top left corner
-    if(max_val_trebel > max_val_bass):
-        return 0
-    else:
-        return 1
+            _, binary_scores_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
+            binary_scores_img = np.array(binary_scores_img, dtype=np.uint8)  # Make sure type is correct
+
+            # Connect the components
+            num_clefs, _, _, clef_centroids = cv2.connectedComponentsWithStats(binary_scores_img)
+
+            total_clefs += num_clefs - 1
+
+            found_clefs.append(clef_centroids[1::])
+            for x, y in clef_centroids[1::]:  # Only draw if there's a point that meets the threshold
+                x, y = int(x), int(y)
+                temp_h, temp_w, _ = 50, 50, 0
+                cv2.rectangle(bgr_img, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255))
+
+        if total_clefs == len(staffs):
+            for i in range(2):
+                for x, y in found_clefs[i]:  # Only draw if there's a point that meets the threshold
+                    x, y = int(x), int(y)
+                    temp_h, temp_w, _ = scaled_templates[i].shape
+                    cv2.rectangle(bgr_img, (x, y), (x+temp_w, y+temp_h), (0,0,255))
+
+        scale += scale_step
+
+    cv2.imshow("Cleffs", bgr_img)
+    cv2.waitKey(0)
+
 
 # Note detection
 def detect_note(bgr_img):
