@@ -49,6 +49,7 @@ class Staff:
 
             self.notes.append((letter, octave, counts))
 
+
     def __str__(self):
         return ("Staff:\n" +
         "\tlines: %s\n" +
@@ -264,20 +265,22 @@ def detect_notes(gray_img, staff):
 
         match_image = np.copy(staff_image)
         for x, y in centroids[1::]:
-            cx = x + scaled_template.shape[0]/2
-            cy = y + scaled_template.shape[1]/2 + int(staff_top - vpadding * staff_height)
+            cx = x + scaled_template.shape[1]/2
+            cy = y + scaled_template.shape[0]/2 + int(staff_top - vpadding * staff_height)
             notes.append(((cx, cy), counts))
 
             x = int(x)
             y = int(y)
-            cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[1]), (0, 0, 255), 2)
+            cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 2)
 
-        cv2.imshow("%u Count Matches" % counts, match_image)
-        cv2.waitKey(0)
+        # cv2.imshow("%u Count Matches" % counts, match_image)
+        # cv2.waitKey(0)
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
     notes_y = [(coord[1], counts) for coord, counts in notes]   # Notes defined by y-coordinates and counts
     staff.set_notes(notes_y)    # Set notes variable of staff
+
+    print(staff.notes)
 
 
