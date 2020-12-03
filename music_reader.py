@@ -14,7 +14,7 @@ def music_reader(filename):
     staffs = detect_staff_lines(binary_img)
 
     #If the clef is a trebel clef it returns 0, else if it is a bass clef return 1
-    staffs = detect_clefs(bgr_img, staffs)
+    staffs = detect_clefs(binary_img, staffs)
 
     for staff in staffs:
         detect_notes(bgr_img, staff)
@@ -23,7 +23,7 @@ def music_reader(filename):
 
 
 if __name__ == '__main__':
-    filename = os.path.join(MEDIA_DIR, 'fireflies.jpg')
+    filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb.jpg')
     music_reader(filename)
 
 
