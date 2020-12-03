@@ -7,6 +7,8 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 
 class Staff:
+    vpadding = 0.5
+
     treble_ref_letter = 'F'     # Note letter on top line of treble staff
     treble_ref_octave = 5       # Note octave on top line of treble staff
 
@@ -157,88 +159,89 @@ def detect_clefs(binary_img, staffs):
     return staffs
 
 
-def detect_notes(gray_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
-    # Grabs the position of the lines in the staff and adds a buffer
-    y1 = staff.lines[0][1]
-    y5 = staff.lines[4][1]
-    buffer_dif_y = int((y5 - y1))
-    x_start = staff.lines[0][0]
-    x_stop = staff.lines[0][2]
-    buffer_dif_x = int((x_stop - x_start) / 15)
-    crop_img = gray_img[y1 - buffer_dif_y:y5 + buffer_dif_y, x_start + buffer_dif_x:x_stop]
-    staff.img = crop_img
-    # Crop this area in sheet music image (bgr_img), slighty larger
+# def detect_notes(gray_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
+#     # Grabs the position of the lines in the staff and adds a buffer
+#     y1 = staff.lines[0][1]
+#     y5 = staff.lines[4][1]
+#     buffer_dif_y = int((y5 - y1))
+#     x_start = staff.lines[0][0]
+#     x_stop = staff.lines[0][2]
+#     buffer_dif_x = int((x_stop - x_start) / 15)
+#     crop_img = gray_img[y1 - buffer_dif_y:y5 + buffer_dif_y, x_start + buffer_dif_x:x_stop]
+#     staff.img = crop_img
+#     # Crop this area in sheet music image (bgr_img), slighty larger
+#
+#     # Showing for testing
+#     cv2.imshow("Cropped", crop_img)
+#     # cv2.waitKey(0)
+#
+#     # Get the binary image
+#     _, thresh_img = cv2.threshold(crop_img, 240, 255, cv2.THRESH_BINARY)  # Get rid of gray values (helps fill in notes)
+#
+#     # Perform openings/closings until notes are largest connected components
+#     kernel = np.ones((2, 1), np.uint8)
+#     filtered_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)  # Get rid of staff lines
+#     kernel = np.ones((1, 4), np.uint8)
+#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE,
+#                                     kernel)  # Get rid of horizontal lines (for eight and sixteenth notes)
+#     kernel = np.ones((5, 3), np.uint8)
+#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_OPEN, kernel)  # Fill in half and whole notes
+#     kernel = np.ones((5, 1), np.uint8)
+#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other horizontal lines
+#     kernel = np.ones((1, 4), np.uint8)
+#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other vertical lines
+#     cv2.imshow("Filtered", filtered_img)  # TESTING
+#     cv2.waitKey(0)
+#     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
+#     # Order components by x-coord (L -> R)
+#
+#     # notes = []
+#     # For every component found
+#         # Compare area to templates of note values      <-- NOT SURE if we are considering this (worry about the rest first)
+#         # If no match, not a note
+#         # Else assign note value
+#
+#         # Check y coord of center
+#         # Compare to staff lines y-coords
+#         # Based on cleff
+#             # Assign note
+#
+#         # Add to some array
+#
+#
+#     # Add note array in
+#
+#     # padding = 0.5
+#     # for staff in staffs:
+#     #     staff_top = staff.lines[0][1]
+#     #     staff_height = staff.lines[-1][1] - staff_top
+#     #     staff_image = binary_img[int(staff_top - padding * staff_height):int(staff_top + staff_height + padding * staff_height),
+#     #                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
+#
+#
+#     return ""
 
-    # Showing for testing
-    cv2.imshow("Cropped", crop_img)
-    # cv2.waitKey(0)
 
-    # Get the binary image
-    _, thresh_img = cv2.threshold(crop_img, 240, 255, cv2.THRESH_BINARY)  # Get rid of gray values (helps fill in notes)
-
-    # Perform openings/closings until notes are largest connected components
-    kernel = np.ones((2, 1), np.uint8)
-    filtered_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)  # Get rid of staff lines
-    kernel = np.ones((1, 4), np.uint8)
-    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE,
-                                    kernel)  # Get rid of horizontal lines (for eight and sixteenth notes)
-    kernel = np.ones((5, 3), np.uint8)
-    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_OPEN, kernel)  # Fill in half and whole notes
-    kernel = np.ones((5, 1), np.uint8)
-    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other horizontal lines
-    kernel = np.ones((1, 4), np.uint8)
-    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other vertical lines
-    cv2.imshow("Filtered", filtered_img)  # TESTING
-    cv2.waitKey(0)
-    # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
-    # Order components by x-coord (L -> R)
-
-    # notes = []
-    # For every component found
-        # Compare area to templates of note values      <-- NOT SURE if we are considering this (worry about the rest first)
-        # If no match, not a note
-        # Else assign note value
-
-        # Check y coord of center
-        # Compare to staff lines y-coords
-        # Based on cleff
-            # Assign note
-
-        # Add to some array
-
-
-    # Add note array in
-
-    # padding = 0.5
-    # for staff in staffs:
-    #     staff_top = staff.lines[0][1]
-    #     staff_height = staff.lines[-1][1] - staff_top
-    #     staff_image = binary_img[int(staff_top - padding * staff_height):int(staff_top + staff_height + padding * staff_height),
-    #                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
-
-
-    return ""
-
-
-def detect_notes_1(binary_img, staff):
-    C_THRESH = 0.6
+def detect_notes(gray_img, staff):
+    C_THRESH = 0.7
     vpadding = 0.5
+
+    # Get rid of staff lines
+    kernel = np.ones((2, 1), np.uint8)
+    gray_img = cv2.morphologyEx(gray_img, cv2.MORPH_CLOSE, kernel)
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
-        (cv2.imread(TEMPLATE_DIR+'/half-note-line.jpg'), 2),
         (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
     ]
 
     notes = []  # ((x, y), counts)
     for template, counts in templates:
-        # Convert Template to Binary
-        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
-        _, template = cv2.threshold(template, 127, 255, cv2.THRESH_BINARY)
+        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)   # Grayscale the template
 
         staff_top = staff.lines[0][1]
         staff_height = staff.lines[-1][1] - staff_top
-        staff_image = binary_img[int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
+        staff_image = gray_img[int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
                             staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
         # Scale template
@@ -251,7 +254,11 @@ def detect_notes_1(binary_img, staff):
         _, thresh_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
         thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
 
-        # TODO: perform small closing on thresh_img to reduce duplicates
+        kernel = np.ones(scaled_template.shape, np.uint8)
+        thresh_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)
+
+        # cv2.imshow("Thresh", thresh_img)
+        # cv2.waitKey(0)
 
         _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)
 
@@ -270,12 +277,7 @@ def detect_notes_1(binary_img, staff):
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
-
-    staff.set_notes([(coord[1], counts) for coord, counts in notes])
-
-    print(staff.notes)
+    notes_y = [(coord[1], counts) for coord, counts in notes]   # Notes defined by y-coordinates and counts
+    staff.set_notes(notes_y)    # Set notes variable of staff
 
 
-
-
-    pprint(notes)

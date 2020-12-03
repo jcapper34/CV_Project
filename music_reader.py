@@ -15,12 +15,10 @@ def music_reader(filename):
 
     staffs = detect_clefs(binary_img, staffs)
 
-    staffs[0].set_notes([
-        (344, 1)
-    ])
+    for staff in staffs:
+        detect_notes(gray_img, staff)
 
 
 if __name__ == '__main__':
-    filename = os.path.join(MEDIA_DIR, 'tiny-dancer.png')
+    filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb.jpg')
     music_reader(filename)
-
