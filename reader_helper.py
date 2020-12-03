@@ -57,15 +57,18 @@ class Staff:
 
 def detect_staff_lines(binary_img):
     # Thresholds
-    MIN_HOUGH_VOTES_FRACTION = 0.6       # threshold = min_hough_votes_fraction * image width
+    MIN_HOUGH_VOTES_FRACTION = 0.7       # threshold = min_hough_votes_fraction * image width
     MIN_LINE_LENGTH_FRACTION = 0.4      # image_width * min_line_length
     MAX_LINE_GAP = 40
     MAX_LINE_ANGLE = 1.0    # Degrees
     LINE_SPACE_VARIATION = 1
 
+
+    # TODO: Houghlines for thick staff lines
     # Find black lines with houghLinesP
     image_width = binary_img.shape[1]
     inv_img = 255 - binary_img
+
     lines = cv2.HoughLinesP(
         image=inv_img,
         rho=1,
@@ -108,13 +111,14 @@ def detect_staff_lines(binary_img):
     assert len(staffs) % 2 == 0, "Must have an even number of staffs"
 
     # cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
+    # cv2.imshow("Staff image", lines_img)
     # cv2.waitKey(0)
 
     return staffs
 
 
 def detect_clefs(binary_img, staffs):
-    C_THRESH = 0.6        # Template matching threshold
+    C_THRESH = 0.5        # Template matching threshold
     TREBLE_PADDING = 0.5   # The treble clef extends from around 50% above to 50% below the staff
 
     # Read in clef templates as binary images
@@ -152,19 +156,18 @@ def detect_clefs(binary_img, staffs):
     return staffs
 
 
-def detect_notes(bgr_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
-
+def detect_notes(gray_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
     #Grabs the position of the lines in the staff and adds a buffer
     y1 = staff.lines[0][1]
     y5 = staff.lines[4][1]
-    buffer_dif_y = int((y5 - y1))
+    buffer_dif_y = int(y5 - y1)
     x_start = staff.lines[0][0]
     x_stop = staff.lines[0][2]
     buffer_dif_x = int((x_stop - x_start)/9)
-    crop_img = bgr_img[y1-buffer_dif_y:y5+buffer_dif_y, x_start+buffer_dif_x:x_stop]
+    crop_img = gray_img[y1 - buffer_dif_y:y5 + buffer_dif_y, x_start + buffer_dif_x:x_stop]
     staff.img = crop_img
+
     # Crop this area in sheet music image (bgr_img), slighty larger
-    gray_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
     cv2.imshow("Grey", gray_img)
     cv2.waitKey(0)
 
@@ -205,5 +208,47 @@ def detect_notes(bgr_img, staff): # NEEDS to take in 1 staff objects at a time, 
     #                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
 
 
-
     return ""
+
+
+def detect_notes_1(binary_img, staff):
+    C_THRESH = 0.6
+
+    templates = [   # (Template Image, Counts)
+        (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
+        (cv2.imread(TEMPLATE_DIR+'/half-note-line.jpg'), 2),
+        (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
+    ]
+    vpadding = 0.5
+    for template, counts in templates:
+        # Convert Template to Binary
+        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+        _, template = cv2.threshold(template, 127, 255, cv2.THRESH_BINARY)
+
+        staff_top = staff.lines[0][1]
+        staff_height = staff.lines[-1][1] - staff_top
+        staff_image = binary_img[int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
+                            staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
+
+        # Scale template
+        scale = (staff_height/4) / template.shape[0]
+        scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)
+
+        c = cv2.matchTemplate(staff_image, scaled_template, cv2.TM_CCOEFF_NORMED)
+
+        # Get all points at threshold
+        _, thresh_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
+        thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
+
+        # TODO: perform small closing on thresh_img to reduce duplicates
+
+        _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)
+
+        match_image = np.copy(staff_image)
+        for x, y in centroids[1::]:
+            x = int(x)
+            y = int(y)
+            cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[1]), (0, 0, 255), 2)
+
+        cv2.imshow("%u Count Matches" % counts, match_image)
+        cv2.waitKey(0)
