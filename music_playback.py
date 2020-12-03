@@ -6,7 +6,7 @@ import numpy as np
 import simpleaudio as sa
 
 SAMPLE_RATE = 44100
-QUARTER_DURATION = 0.6     # Duration of quarter note (sec)
+QUARTER_DURATION = 0.5     # Duration of quarter note (sec)
 NOTE_STOP = 0.01            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
@@ -56,7 +56,8 @@ def play_notes(notes):
             part_wave = np.array([])
             for note in part:
                 if isinstance(note, tuple):
-                    letter, octave, accidental, duration = note
+                    letter, octave, accidental, counts = note
+                    duration = counts*QUARTER_DURATION
                     frequency = get_frequency(letter, octave, accidental)
 
                     # Create sampled time range
@@ -87,19 +88,19 @@ def play_notes(notes):
 if __name__ == '__main__':
     # Mary Had a Little Lamb
     play_notes([
-        [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
-        [('D', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
-        [('C', 5, None, QUARTER_DURATION), ('G', 4, None, QUARTER_DURATION)],
-        [('D', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
-        [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
-        [('E', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
-        [('E', 5, None, QUARTER_DURATION*2), [('C', 4, None, QUARTER_DURATION), ('D', 4, None, QUARTER_DURATION)]],
-        [('D', 5, None, QUARTER_DURATION), ('G', 3, None, QUARTER_DURATION)],
-        [('D', 5, None, QUARTER_DURATION), ('B', 3, None, QUARTER_DURATION)],
-        [('D', 5, None, QUARTER_DURATION*2), [('D', 4, None, QUARTER_DURATION), ('B', 3, None, QUARTER_DURATION)]],
-        [('E', 5, None, QUARTER_DURATION), ('C', 4, None, QUARTER_DURATION)],
-        [('G', 5, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)],
-        [('G', 5, None, QUARTER_DURATION*2), [('G', 4, None, QUARTER_DURATION), ('E', 4, None, QUARTER_DURATION)]],
+        [('E', 5, None, 1), ('C', 4, None, 1)],
+        [('D', 5, None, 1), ('E', 4, None, 1)],
+        [('C', 5, None, 1), ('G', 4, None, 1)],
+        [('D', 5, None, 1), ('E', 4, None, 1)],
+        [('E', 5, None, 1), ('C', 4, None, 1)],
+        [('E', 5, None, 1), ('E', 4, None, 1)],
+        [('E', 5, None, 2), [('C', 4, None, 1), ('D', 4, None, 1)]],
+        [('D', 5, None, 1), ('G', 3, None, 1)],
+        [('D', 5, None, 1), ('B', 3, None, 1)],
+        [('D', 5, None, 2), [('D', 4, None, 1), ('B', 3, None, 1)]],
+        [('E', 5, None, 1), ('C', 4, None, 1)],
+        [('G', 5, None, 1), ('E', 4, None, 1)],
+        [('G', 5, None, 2), [('G', 4, None, 1), ('E', 4, None, 1)]],
     ])
 
     # # All Along the Watchtower
