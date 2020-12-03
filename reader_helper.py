@@ -23,8 +23,7 @@ class Staff:
         self.flats = None
         self.img = None
 
-    # This function converts the list of notes(y, counts) to a list of notes(letter, octave, counts) then puts into variable
-    def set_notes(self, notes_y):
+    def y_to_note(self, y):
         num_lines = len(self.lines)
 
         ref_letter = self.treble_ref_letter if self.clef == 0 else self.bass_ref_letter
@@ -36,19 +35,15 @@ class Staff:
         staff_top = self.lines[0][1]
         note_spacing = (self.lines[-1][1] - staff_top) / ((num_lines-1)*2)  # Vertical note spacing (half of line spacing)
 
-        self.notes = []
-        for y, counts in notes_y:
-            note_change = round((y - staff_top) / note_spacing)
-            letter_ord = ord(ref_letter) - note_change
-            if letter_ord < letter_range_start:
-                letter_ord = letter_range_end - (letter_range_start-letter_ord) + 1
+        note_change = round((y - staff_top) / note_spacing)
+        letter_ord = ord(ref_letter) - note_change
+        if letter_ord < letter_range_start:
+            letter_ord = letter_range_end - (letter_range_start - letter_ord) + 1
 
-            letter = chr(int(letter_ord))
+        letter = chr(int(letter_ord))
+        octave = None
 
-            octave = None
-
-            self.notes.append((letter, octave, counts))
-
+        return letter, octave
 
     def __str__(self):
         return ("Staff:\n" +
@@ -223,13 +218,13 @@ def detect_clefs(binary_img, staffs):
 #     return ""
 
 
-def detect_notes(gray_img, staff):
+def detect_notes(binary_img, staff):
     C_THRESH = 0.7
     vpadding = 0.5
 
     # Get rid of staff lines
     kernel = np.ones((2, 1), np.uint8)
-    gray_img = cv2.morphologyEx(gray_img, cv2.MORPH_CLOSE, kernel)
+    binary_img = cv2.morphologyEx(binary_img, cv2.MORPH_CLOSE, kernel)
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
@@ -242,7 +237,7 @@ def detect_notes(gray_img, staff):
 
         staff_top = staff.lines[0][1]
         staff_height = staff.lines[-1][1] - staff_top
-        staff_image = gray_img[int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
+        staff_image = binary_img[int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
                             staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
         # Scale template
@@ -278,9 +273,8 @@ def detect_notes(gray_img, staff):
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
-    notes_y = [(coord[1], counts) for coord, counts in notes]   # Notes defined by y-coordinates and counts
-    staff.set_notes(notes_y)    # Set notes variable of staff
+    notes = [(*staff.y_to_note(coord[1]), counts) for coord, counts in notes]   # Notes defined by y-coordinates and counts
+    staff.notes = notes
 
-    print(staff.notes)
 
 
