@@ -158,30 +158,38 @@ def detect_clefs(binary_img, staffs):
 
 
 def detect_notes(gray_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
-    #Grabs the position of the lines in the staff and adds a buffer
+    # Grabs the position of the lines in the staff and adds a buffer
     y1 = staff.lines[0][1]
     y5 = staff.lines[4][1]
-    buffer_dif_y = int(y5 - y1)
+    buffer_dif_y = int((y5 - y1))
     x_start = staff.lines[0][0]
     x_stop = staff.lines[0][2]
-    buffer_dif_x = int((x_stop - x_start)/9)
+    buffer_dif_x = int((x_stop - x_start) / 15)
     crop_img = gray_img[y1 - buffer_dif_y:y5 + buffer_dif_y, x_start + buffer_dif_x:x_stop]
     staff.img = crop_img
-
     # Crop this area in sheet music image (bgr_img), slighty larger
-    cv2.imshow("Grey", gray_img)
-    cv2.waitKey(0)
 
-    #Get the binary image
-    kernel = np.ones((1, 1), np.uint8)
-    first = cv2.dilate(crop_img, kernel, iterations=2)
-    kernel = np.ones((5, 5), np.uint8)
-    dilate = cv2.dilate(first, kernel, iterations=1)
-    kernel = np.ones((13,13), np.uint8)
-    erosion = cv2.erode(dilate, kernel, iterations=1)
-    cv2.imshow("GREY", erosion)
-    cv2.waitKey(0)
+    # Showing for testing
+    cv2.imshow("Cropped", crop_img)
+    # cv2.waitKey(0)
+
+    # Get the binary image
+    _, thresh_img = cv2.threshold(crop_img, 240, 255, cv2.THRESH_BINARY)  # Get rid of gray values (helps fill in notes)
+
     # Perform openings/closings until notes are largest connected components
+    kernel = np.ones((2, 1), np.uint8)
+    filtered_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)  # Get rid of staff lines
+    kernel = np.ones((1, 4), np.uint8)
+    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE,
+                                    kernel)  # Get rid of horizontal lines (for eight and sixteenth notes)
+    kernel = np.ones((5, 3), np.uint8)
+    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_OPEN, kernel)  # Fill in half and whole notes
+    kernel = np.ones((5, 1), np.uint8)
+    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other horizontal lines
+    kernel = np.ones((1, 4), np.uint8)
+    filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other vertical lines
+    cv2.imshow("Filtered", filtered_img)  # TESTING
+    cv2.waitKey(0)
     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
     # Order components by x-coord (L -> R)
 
