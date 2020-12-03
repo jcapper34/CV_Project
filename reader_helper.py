@@ -11,6 +11,7 @@ class Staff:
         self.clef = None    # 0 if treble else bass if 1
         self.sharps = None
         self.flats = None
+        self.img = None
 
     def __str__(self):
         return ("Staff:\n" +
@@ -109,7 +110,6 @@ def detect_clefs(binary_img, staffs):
                 detected_clef = clef_num
 
         staff.clef = detected_clef
-        cv2.imshow("Staff", staff_image)
         cv2.waitKey(0)
 
     return staffs
@@ -125,8 +125,10 @@ def detect_notes(bgr_img, staff): # NEEDS to take in 1 staff objects at a time, 
     x_start = staff.lines[0][0]
     x_stop = staff.lines[0][2]
     crop_img = bgr_img[y1-buffer_dif_y:y5+buffer_dif_y, x_start:x_stop]
+    staff.img = crop_img
     # Crop this area in sheet music image (bgr_img), slighty larger
-
+    cv2.imshow("GREY", staff.img)
+    cv2.waitKey(0)
     # Perform openings/closings until notes are largest connected components
     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
     # Order components by x-coord (L -> R)

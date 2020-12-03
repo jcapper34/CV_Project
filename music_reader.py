@@ -18,8 +18,6 @@ def music_reader(filename):
 
     for staff in staffs:
         detect_notes(bgr_img, staff)
-        print(staff)
-
 
 
 if __name__ == '__main__':
