@@ -17,6 +17,7 @@ def music_reader(filename):
     staffs = detect_clefs(bgr_img, staffs)
 
     for staff in staffs:
+        detect_notes(bgr_img, staff)
         print(staff)
 
 
