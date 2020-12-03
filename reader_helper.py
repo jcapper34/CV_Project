@@ -18,6 +18,7 @@ class Staff:
         self.clef = None    # 0 if treble else bass if 1
         self.sharps = None
         self.flats = None
+        self.img = None
 
     # This function converts the list of notes(y, counts) to a list of notes(letter, octave, counts) then puts into variable
     def set_notes(self, notes_y):
@@ -151,12 +152,19 @@ def detect_clefs(binary_img, staffs):
     return staffs
 
 
-# Note detection
-def detect_notes(binary_img, staffs): # NEEDS to take in 1 staff objects at a time, clef
-    # TODO make note object, add note list to staff object
-    # Get length and width of staff line
-    # Crop this area in sheet music image (bgr_img), slightly larger
+def detect_notes(bgr_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
 
+    #Grabs the position of the lines in the staff and adds a buffer
+    y1 = staff.lines[0][1]
+    y5 = staff.lines[4][1]
+    buffer_dif_y = int((y5 - y1))
+    x_start = staff.lines[0][0]
+    x_stop = staff.lines[0][2]
+    crop_img = bgr_img[y1-buffer_dif_y:y5+buffer_dif_y, x_start:x_stop]
+    staff.img = crop_img
+    # Crop this area in sheet music image (bgr_img), slighty larger
+    cv2.imshow("GREY", staff.img)
+    cv2.waitKey(0)
     # Perform openings/closings until notes are largest connected components
     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
     # Order components by x-coord (L -> R)
@@ -177,12 +185,12 @@ def detect_notes(binary_img, staffs): # NEEDS to take in 1 staff objects at a ti
 
     # Add note array in
 
-    padding = 0.5
-    for staff in staffs:
-        staff_top = staff.lines[0][1]
-        staff_height = staff.lines[-1][1] - staff_top
-        staff_image = binary_img[int(staff_top - padding * staff_height):int(staff_top + staff_height + padding * staff_height),
-                      staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
+    # padding = 0.5
+    # for staff in staffs:
+    #     staff_top = staff.lines[0][1]
+    #     staff_height = staff.lines[-1][1] - staff_top
+    #     staff_image = binary_img[int(staff_top - padding * staff_height):int(staff_top + staff_height + padding * staff_height),
+    #                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
 
 
 
