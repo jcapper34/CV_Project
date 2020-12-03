@@ -124,10 +124,22 @@ def detect_notes(bgr_img, staff): # NEEDS to take in 1 staff objects at a time, 
     buffer_dif_y = int((y5 - y1))
     x_start = staff.lines[0][0]
     x_stop = staff.lines[0][2]
-    crop_img = bgr_img[y1-buffer_dif_y:y5+buffer_dif_y, x_start:x_stop]
+    buffer_dif_x = int((x_stop - x_start)/9)
+    crop_img = bgr_img[y1-buffer_dif_y:y5+buffer_dif_y, x_start+buffer_dif_x:x_stop]
     staff.img = crop_img
     # Crop this area in sheet music image (bgr_img), slighty larger
-    cv2.imshow("GREY", staff.img)
+    gray_img = cv2.cvtColor(crop_img, cv2.COLOR_BGR2GRAY)
+    cv2.imshow("Grey", gray_img)
+    cv2.waitKey(0)
+
+    #Get the binary image
+    kernel = np.ones((1, 1), np.uint8)
+    first = cv2.dilate(crop_img, kernel, iterations=2)
+    kernel = np.ones((5, 5), np.uint8)
+    dilate = cv2.dilate(first, kernel, iterations=1)
+    kernel = np.ones((13,13), np.uint8)
+    erosion = cv2.erode(dilate, kernel, iterations=1)
+    cv2.imshow("GREY", erosion)
     cv2.waitKey(0)
     # Perform openings/closings until notes are largest connected components
     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
