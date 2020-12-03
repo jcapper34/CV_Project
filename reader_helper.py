@@ -43,7 +43,7 @@ class Staff:
             if letter_ord < letter_range_start:
                 letter_ord = letter_range_end - (letter_range_start-letter_ord) + 1
 
-            letter = chr(letter_ord)
+            letter = chr(int(letter_ord))
 
             octave = None
 
