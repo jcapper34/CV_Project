@@ -13,28 +13,14 @@ def music_reader(filename):
 
     staffs = detect_staff_lines(binary_img)
 
-    #If the clef is a trebel clef it returns 0, else if it is a bass clef return 1
     staffs = detect_clefs(binary_img, staffs)
 
-    for staff in staffs:
-        print(staff)
-
+    staffs[0].set_notes([
+        (344, 1)
+    ])
 
 
 if __name__ == '__main__':
-    filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb.jpg')
+    filename = os.path.join(MEDIA_DIR, 'tiny-dancer.png')
     music_reader(filename)
 
-
-    # bass_template = cv2.imread("templates/bass-clef.JPG")
-    # row = np.array([(255, 255, 255) for j in range(bass_template.shape[1])])
-    #
-    # for i in range(46):
-    #     bass_template = np.insert(bass_template, 0, row, axis=0)
-    #
-    # for i in range(45):
-    #
-    #     bass_template = np.insert(bass_template, -1, row, axis=0)
-    #
-    #
-    # cv2.imwrite("templates/bass-clef.JPG", bass_template)

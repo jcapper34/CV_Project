@@ -6,17 +6,52 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 
 class Staff:
+    treble_ref_letter = 'F'     # Note letter on top line of treble staff
+    treble_ref_octave = 5       # Note octave on top line of treble staff
+
+    bass_ref_letter = 'A'       # Note letter on top line of bass staff
+    bass_ref_octave = 3         # Note octave on top line of bass staff
+
     def __init__(self, lines):
         self.lines = lines
+        self.notes = None
         self.clef = None    # 0 if treble else bass if 1
         self.sharps = None
         self.flats = None
 
+    # This function converts the list of notes(y, counts) to a list of notes(letter, octave, counts) then puts into variable
+    def set_notes(self, notes_y):
+        num_lines = len(self.lines)
+
+        ref_letter = self.treble_ref_letter if self.clef == 0 else self.bass_ref_letter
+        letter_range_start = ord('A')
+        letter_range_end = ord('G')
+
+        ref_octave = self.treble_ref_octave if self.clef == 0 else self.bass_ref_octave
+
+        staff_top = self.lines[0][1]
+        note_spacing = (self.lines[-1][1] - staff_top) / ((num_lines-1)*2)  # Vertical note spacing (half of line spacing)
+
+        self.notes = []
+        for y, counts in notes_y:
+            note_change = round((y - staff_top) / note_spacing)
+            letter_ord = ord(ref_letter) - note_change
+            if letter_ord < letter_range_start:
+                letter_ord = letter_range_end - (letter_range_start-letter_ord) + 1
+
+            letter = chr(letter_ord)
+
+            octave = None
+
+            self.notes.append((letter, octave, counts))
+
     def __str__(self):
         return ("Staff:\n" +
         "\tlines: %s\n" +
-        "\tclef: %s") % (str(self.lines),
-                         "Treble" if self.clef == 0 else "Bass" if self.clef == 1 else 'None')
+        "\tclef: %s\n" +
+        "\tnotes: %s") % (str(self.lines),
+                         "Treble" if self.clef == 0 else "Bass" if self.clef == 1 else 'None',
+                          str(self.notes))
 
 
 def detect_staff_lines(binary_img):
@@ -27,8 +62,7 @@ def detect_staff_lines(binary_img):
     MAX_LINE_ANGLE = 1.0    # Degrees
     LINE_SPACE_VARIATION = 1
 
-
-    # Find lines with houghLinesP
+    # Find black lines with houghLinesP
     image_width = binary_img.shape[1]
     inv_img = 255 - binary_img
     lines = cv2.HoughLinesP(
@@ -79,7 +113,7 @@ def detect_staff_lines(binary_img):
 
 
 def detect_clefs(binary_img, staffs):
-    C_THRESH = 0.7        # Template matching threshold
+    C_THRESH = 0.6        # Template matching threshold
     TREBLE_PADDING = 0.5   # The treble clef extends from around 50% above to 50% below the staff
 
     # Read in clef templates as binary images
@@ -98,6 +132,7 @@ def detect_clefs(binary_img, staffs):
                             staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
         detected_clef = None
+        # TODO: Slightly vary template scale until a sweet spot is found
         for clef_num, template in enumerate((treble_template, bass_template)):
             scale = staff_image.shape[0] / template.shape[0]
             scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template to be same height as staff
@@ -109,14 +144,15 @@ def detect_clefs(binary_img, staffs):
                 detected_clef = clef_num
 
         staff.clef = detected_clef
-        cv2.imshow("Staff", staff_image)
-        cv2.waitKey(0)
+
+        # cv2.imshow("Staff", staff_image)
+        # cv2.waitKey(0)
 
     return staffs
 
 
 # Note detection
-def detect_notes(bgr_img): # NEEDS to take in 1 staff objects at a time, clef
+def detect_notes(binary_img, staffs): # NEEDS to take in 1 staff objects at a time, clef
     # TODO make note object, add note list to staff object
     # Get length and width of staff line
     # Crop this area in sheet music image (bgr_img), slightly larger
@@ -140,5 +176,14 @@ def detect_notes(bgr_img): # NEEDS to take in 1 staff objects at a time, clef
 
 
     # Add note array in
+
+    padding = 0.5
+    for staff in staffs:
+        staff_top = staff.lines[0][1]
+        staff_height = staff.lines[-1][1] - staff_top
+        staff_image = binary_img[int(staff_top - padding * staff_height):int(staff_top + staff_height + padding * staff_height),
+                      staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
+
+
 
     return ""
