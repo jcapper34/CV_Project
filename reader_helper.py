@@ -33,7 +33,7 @@ class Staff:
 
         note_change = round((y-staff_top) / note_spacing)
 
-        return ref[note_change]
+        return ref[int(note_change)]
 
     def __str__(self):
         return ("Staff:\n" +
