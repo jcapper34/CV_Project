@@ -7,9 +7,6 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 
 class Staff:
-    vpadding = 0.5
-
-
     def __init__(self, lines):
         self.lines = lines
         self.notes = None
@@ -18,7 +15,7 @@ class Staff:
         self.flats = None
         self.img = None
 
-    # Super sloppy way of determining the note from y coordinate, needs to be changed later
+    # Super sloppy way of determining the note from y coordinate. TODO: Change before final report
     def y_to_note(self, y):
         letter_range_start = ord('A')
         letter_range_end = ord('G')
@@ -216,15 +213,19 @@ def detect_notes(gray_img, staff):
     vpadding = 0.5
     y_fudge = -1
 
+    # Create subimage
     staff_top = staff.lines[0][1]
     staff_height = staff.lines[-1][1] - staff_top
-    staff_image_w_lines = gray_img[
+    staff_image = gray_img[
                   int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
 
+    # Create image to show matches
+    match_image = cv2.cvtColor(np.copy(staff_image), cv2.COLOR_GRAY2BGR)
+
     # Get rid of staff lines
     kernel = np.ones((2, 1), np.uint8)
-    staff_image = cv2.morphologyEx(staff_image_w_lines, cv2.MORPH_CLOSE, kernel)
+    staff_image = cv2.morphologyEx(staff_image, cv2.MORPH_CLOSE, kernel)
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
@@ -254,9 +255,8 @@ def detect_notes(gray_img, staff):
 
         _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)
 
-        match_image = cv2.cvtColor(np.copy(staff_image_w_lines), cv2.COLOR_GRAY2BGR)
         for x, y in centroids[1::]:
-            y += y_fudge    # Lazy shift up, should be corrected later
+            y += y_fudge    # Lazy shift to fix issue. TODO: Change before final report
 
             # Get note center
             cx = x + scaled_template.shape[1]/2
@@ -269,18 +269,21 @@ def detect_notes(gray_img, staff):
             y = int(y)
 
             # Draw Rectangle around note
-            cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 1)
+            # cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 1)
 
+            font_scale = 0.6
             # Write note value next to note
-            match_image = cv2.putText(match_image, letter+str(octave), (x+scaled_template.shape[1], y), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255))
+            match_image = cv2.putText(match_image, letter+str(octave), (x+scaled_template.shape[1], y), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
 
-        cv2.imshow("%u Counts" % counts, match_image)
-        cv2.waitKey(0)
+            # Write number of counts next to note
+            match_image = cv2.putText(match_image, str(counts), (x+scaled_template.shape[1], int(y+scaled_template.shape[0]*1.4)), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
+
+    cv2.imshow("Matches", match_image)
+    cv2.waitKey(0)
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
-    notes = [(*staff.y_to_note(coord[1]), counts) for coord, counts in notes]   # Notes defined by y-coordinates and counts
+    notes = [(*staff.y_to_note(coord[1]), counts) for coord, counts in notes]   # Notes defined by letter and counts
     staff.notes = notes
-
 
 
