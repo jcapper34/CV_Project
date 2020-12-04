@@ -17,7 +17,7 @@ def music_reader(filename):
 
     for staff in staffs:
         detect_notes(gray_img, staff)
-
+        print(staff)
 
 if __name__ == '__main__':
     filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb.jpg')

@@ -9,11 +9,6 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 class Staff:
     vpadding = 0.5
 
-    treble_ref_letter = 'F'     # Note letter on top line of treble staff
-    treble_ref_octave = 5       # Note octave on top line of treble staff
-
-    bass_ref_letter = 'A'       # Note letter on top line of bass staff
-    bass_ref_octave = 3         # Note octave on top line of bass staff
 
     def __init__(self, lines):
         self.lines = lines
@@ -23,27 +18,25 @@ class Staff:
         self.flats = None
         self.img = None
 
+    # Super sloppy way of determining the note from y coordinate, needs to be changed later
     def y_to_note(self, y):
-        num_lines = len(self.lines)
-
-        ref_letter = self.treble_ref_letter if self.clef == 0 else self.bass_ref_letter
         letter_range_start = ord('A')
         letter_range_end = ord('G')
 
-        ref_octave = self.treble_ref_octave if self.clef == 0 else self.bass_ref_octave
+        if self.clef == 0:
+            ref = [('F', 5), ('E', 5), ('D', 5), ('C', 5), ('B', 4), ('A', 4), ('G', 4), ('F', 4), ('E', 4), ('D', 4),
+                   ('C', 4)]
+        else:
+            ref = [('A', 3), ('G', 3), ('F', 3), ('E', 3), ('D', 3), ('C', 3), ('B', 2), ('A', 2), ('G', 2), ('F', 2),
+                   ('E', 2)]
+
 
         staff_top = self.lines[0][1]
-        note_spacing = (self.lines[-1][1] - staff_top) / ((num_lines-1)*2)  # Vertical note spacing (half of line spacing)
+        note_spacing = (self.lines[-1][1] - staff_top) / ((len(self.lines)-1)*2)  # Vertical note spacing (half of line spacing)
 
-        note_change = round((y - staff_top) / note_spacing)
-        letter_ord = ord(ref_letter) - note_change
-        if letter_ord < letter_range_start:
-            letter_ord = letter_range_end - (letter_range_start - letter_ord) + 1
+        note_change = round((y-staff_top) / note_spacing)
 
-        letter = chr(int(letter_ord))
-        octave = None
-
-        return letter, octave
+        return ref[note_change]
 
     def __str__(self):
         return ("Staff:\n" +
@@ -218,27 +211,29 @@ def detect_clefs(binary_img, staffs):
 #     return ""
 
 
-def detect_notes(binary_img, staff):
+def detect_notes(gray_img, staff):
     C_THRESH = 0.7
     vpadding = 0.5
+    y_fudge = -1
+
+    staff_top = staff.lines[0][1]
+    staff_height = staff.lines[-1][1] - staff_top
+    staff_image_w_lines = gray_img[
+                  int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
+                  staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
 
     # Get rid of staff lines
     kernel = np.ones((2, 1), np.uint8)
-    binary_img = cv2.morphologyEx(binary_img, cv2.MORPH_CLOSE, kernel)
+    staff_image = cv2.morphologyEx(staff_image_w_lines, cv2.MORPH_CLOSE, kernel)
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
-        (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
+        (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2)
     ]
 
     notes = []  # ((x, y), counts)
     for template, counts in templates:
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)   # Grayscale the template
-
-        staff_top = staff.lines[0][1]
-        staff_height = staff.lines[-1][1] - staff_top
-        staff_image = binary_img[int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
-                            staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
         # Scale template
         scale = (staff_height/4) / template.shape[0]
@@ -250,6 +245,7 @@ def detect_notes(binary_img, staff):
         _, thresh_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
         thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
 
+        # Close note blobs
         kernel = np.ones(scaled_template.shape, np.uint8)
         thresh_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)
 
@@ -258,18 +254,28 @@ def detect_notes(binary_img, staff):
 
         _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)
 
-        match_image = np.copy(staff_image)
+        match_image = cv2.cvtColor(np.copy(staff_image_w_lines), cv2.COLOR_GRAY2BGR)
         for x, y in centroids[1::]:
+            y += y_fudge    # Lazy shift up, should be corrected later
+
+            # Get note center
             cx = x + scaled_template.shape[1]/2
             cy = y + scaled_template.shape[0]/2 + int(staff_top - vpadding * staff_height)
             notes.append(((cx, cy), counts))
 
+            letter, octave = staff.y_to_note(cy)
+
             x = int(x)
             y = int(y)
-            cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 2)
 
-        # cv2.imshow("%u Count Matches" % counts, match_image)
-        # cv2.waitKey(0)
+            # Draw Rectangle around note
+            cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 1)
+
+            # Write note value next to note
+            match_image = cv2.putText(match_image, letter+str(octave), (x+scaled_template.shape[1], y), cv2.FONT_HERSHEY_PLAIN, 1, (0,0,255))
+
+        cv2.imshow("%u Counts" % counts, match_image)
+        cv2.waitKey(0)
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
