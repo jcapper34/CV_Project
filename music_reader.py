@@ -1,5 +1,7 @@
 import os
 import cv2
+
+from music_playback import play_sheet
 from reader_helper import *
 
 MEDIA_DIR = 'music-img'
@@ -17,7 +19,9 @@ def music_reader(filename):
 
     for staff in staffs:
         detect_notes(gray_img, staff)
-        print(staff)
+
+    play_sheet(staffs)
+
 
 if __name__ == '__main__':
     filename = os.path.join(MEDIA_DIR, 'mary-had-a-little-lamb.jpg')

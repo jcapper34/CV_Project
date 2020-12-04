@@ -273,13 +273,13 @@ def detect_notes(gray_img, staff):
 
             font_scale = 0.6
             # Write note value next to note
-            match_image = cv2.putText(match_image, letter+str(octave), (x+scaled_template.shape[1], y), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
+            match_image = cv2.putText(match_image, letter+str(octave), (x+scaled_template.shape[1], int(y-scaled_template.shape[0]*0.2)), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
 
             # Write number of counts next to note
-            match_image = cv2.putText(match_image, str(counts), (x+scaled_template.shape[1], int(y+scaled_template.shape[0]*1.4)), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
+            match_image = cv2.putText(match_image, str(counts), (x+scaled_template.shape[1], int(y+scaled_template.shape[0]*1.5)), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
 
-    cv2.imshow("Matches", match_image)
-    cv2.waitKey(0)
+    # cv2.imshow("Matches", match_image)
+    # cv2.waitKey(0)
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 

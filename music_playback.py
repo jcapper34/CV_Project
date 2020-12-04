@@ -6,7 +6,7 @@ import numpy as np
 import simpleaudio as sa
 
 SAMPLE_RATE = 44100
-QUARTER_DURATION = 0.5     # Duration of quarter note (sec)
+QUARTER_DURATION = 0.4     # Duration of quarter note (sec)
 NOTE_STOP = 0.01            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
@@ -35,7 +35,26 @@ def get_frequency(letter, octave, accidental):
     elif accidental is not None:
         letter += accidental
 
-    return NOTE_FREQUENCIES[letter][octave]
+    return NOTE_FREQUENCIES[letter][octave+1]
+
+
+# Assumes that staffs are grouped in pairs
+def play_sheet(staffs, group=2):
+    audio_buffer = np.array([])
+    for i in range(0, len(staffs), group):
+        row_buffer = 0
+        for staff in staffs[i:i+group]:
+            row_buffer += create_note_buffer(staff.notes)
+
+        row_buffer = row_buffer * (2 ** 15 - 1) / np.max(np.abs(row_buffer))
+
+        # play_obj = sa.play_buffer(row_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
+        # play_obj.wait_done()
+
+        audio_buffer = np.append(audio_buffer, row_buffer.astype(np.int16), axis=0)
+
+    play_obj = sa.play_buffer(audio_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
+    play_obj.wait_done()
 
 
 """
@@ -83,6 +102,22 @@ def play_notes(notes):
     # Start playback
     play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
     play_obj.wait_done()
+
+
+# Needs to be edited to use annotations
+def create_note_buffer(notes):
+    audio_buffer = np.array([])
+    for letter, octave, counts in notes:
+        duration = counts * QUARTER_DURATION
+        frequency = get_frequency(letter, octave, None)
+
+        # Time array
+        t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
+
+        # Sine wave of note frequency
+        audio_buffer = np.append(audio_buffer, np.sin(frequency * t * 2 * np.pi), axis=0)
+
+    return audio_buffer
 
 
 if __name__ == '__main__':
