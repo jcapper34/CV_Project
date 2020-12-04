@@ -3,6 +3,7 @@ import cv2
 
 from music_playback import play_sheet
 from reader_helper import *
+from image_reader import *
 
 MEDIA_DIR = 'music-img'
 TEMPLATE_DIR = 'templates'
