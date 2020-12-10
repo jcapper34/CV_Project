@@ -5,15 +5,28 @@ import os
 import numpy as np
 from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
+BINARY_THRESH = 190
 
 class Staff:
+    vpadding = 0.5
+
     def __init__(self, lines):
         self.lines = lines
         self.notes = None
         self.clef = None    # 0 if treble else bass if 1
         self.sharps = None
         self.flats = None
-        self.img = None
+        self.gray_img = None
+        self.binary_img = None
+
+    def make_subimg(self, gray_img):
+        staff_top = self.lines[0][1]
+        staff_height = self.lines[-1][1] - staff_top
+        self.gray_img = gray_img[int(staff_top - self.vpadding * staff_height):int(
+            staff_top + staff_height + self.vpadding * staff_height),
+                      self.lines[0][0]:self.lines[0][-2]]  # Create sub-image of staff
+
+        _, self.binary_img = cv2.threshold(self.gray_img, BINARY_THRESH, 255, cv2.THRESH_BINARY)
 
     # Super sloppy way of determining the note from y coordinate. TODO: Change before final report
     def y_to_note(self, y):
@@ -49,11 +62,10 @@ def detect_staff_lines(binary_img):
     MIN_HOUGH_VOTES_FRACTION = 0.7       # threshold = min_hough_votes_fraction * image width
     MIN_LINE_LENGTH_FRACTION = 0.4      # image_width * min_line_length
     MAX_LINE_GAP = 40
-    MAX_LINE_ANGLE = 1.0    # Degrees
-    LINE_SPACE_VARIATION = 1
-    VERTICAL_LINE_GROUP = 1
+    MAX_LINE_ANGLE = 1.0                # Degrees
+    LINE_SPACE_VARIATION = 1            # The error allowed in vertical spacing when grouping into staffs
+    VERTICAL_LINE_GROUP = 1             # The vertical difference between two lines that will make them be treated as the same line
 
-    # TODO: Houghlines for thick staff lines
     # Find black lines with houghLinesP
     image_width = binary_img.shape[1]
     inv_img = 255 - binary_img
@@ -96,7 +108,6 @@ def detect_staff_lines(binary_img):
         # Delete the other the vertically connected lines that aren't the original
         for k in range(i, i+len(nearby_lines)-1):
             filtered_lines.pop(k)
-
         i += 1
 
     # Draw Staff lines on blank image
@@ -104,10 +115,6 @@ def detect_staff_lines(binary_img):
     for x1, y1, x2, y2 in filtered_lines:
         x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
         cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0), thickness=1)
-
-
-    cv2.imshow("Staff image", lines_img)
-    cv2.waitKey(0)
 
     # Group lines into staffs
     staffs = []
@@ -124,7 +131,7 @@ def detect_staff_lines(binary_img):
         assert num_spacings == 4 or num_spacings == 1, "Staff Lines Detected Incorrectly"
 
         if num_spacings == 4:
-            staffs.append(Staff(filtered_lines[start_i: i+1]))
+            staffs.append(Staff(filtered_lines[start_i:i+1]))
 
     cv2.imshow("Staff image", lines_img)
     cv2.waitKey(0)
@@ -132,9 +139,8 @@ def detect_staff_lines(binary_img):
     return staffs
 
 
-def detect_clefs(binary_img, staffs):
+def detect_clefs(staffs):
     C_THRESH = 0.5        # Template matching threshold
-    TREBLE_PADDING = 0.5   # The treble clef extends from around 50% above to 50% below the staff
 
     # Read in clef templates as binary images
     treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
@@ -148,33 +154,28 @@ def detect_clefs(binary_img, staffs):
     clefs = []
     for staff in staffs:
         staff_top = staff.lines[0][1]
-        staff_height = staff.lines[-1][1] - staff_top
-        staff_image = binary_img[int(staff_top - TREBLE_PADDING * staff_height):int(staff_top + staff_height + TREBLE_PADDING * staff_height),
-                            staff.lines[0][0]:staff.lines[0][-2]]   # Create sub-image of staff
 
         detected_clef = None
+        matched_clefs = []
         # TODO: Slightly vary template scale until a sweet spot is found
         for clef_num, template in enumerate((treble_template, bass_template)):
-            scale = staff_image.shape[0] / template.shape[0]
+            scale = staff.binary_img.shape[0] / template.shape[0]
             scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template to be same height as staff
 
-            c = cv2.matchTemplate(staff_image, scaled_template, cv2.TM_CCOEFF_NORMED)   # Get template matching scores
+            c = cv2.matchTemplate(staff.binary_img, scaled_template, cv2.TM_CCOEFF_NORMED)   # Get template matching scores
             _, max_val, _, max_loc = cv2.minMaxLoc(c)
 
             if max_val > C_THRESH:
                 detected_clef = clef_num
-                if detected_clef == 0:
-                    clef_name = "Treble"
-                else:
-                    clef_name = "Bass"
                 clefs.append((detected_clef, (max_loc[0]+scaled_template.shape[0]+staff.lines[0][0]-60, max_loc[1]+staff_top-10)))
+                break
 
         staff.clef = detected_clef
 
     return staffs, clefs
 
 
-def detect_notes(binary_img, staff, annotate=True):
+def detect_notes(staff, annotate=True):
     C_THRESH = 0.7
     vpadding = 0.5
     y_fudge = -1
@@ -182,16 +183,13 @@ def detect_notes(binary_img, staff, annotate=True):
     # Create subimage
     staff_top = staff.lines[0][1]
     staff_height = staff.lines[-1][1] - staff_top
-    staff_image = binary_img[
-                  int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
-                  staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
 
     # Create image to show matches
-    match_image = cv2.cvtColor(np.copy(staff_image), cv2.COLOR_GRAY2BGR)
+    match_image = cv2.cvtColor(np.copy(staff.binary_img), cv2.COLOR_GRAY2BGR)
 
     # Get rid of staff lines
     kernel = np.ones((2, 1), np.uint8)
-    staff_image = cv2.morphologyEx(staff_image, cv2.MORPH_CLOSE, kernel)
+    staff_image = cv2.morphologyEx(staff.binary_img, cv2.MORPH_CLOSE, kernel)
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
@@ -249,11 +247,11 @@ def detect_notes(binary_img, staff, annotate=True):
             match_image = cv2.putText(match_image, str(counts), (x+scaled_template.shape[1], int(y+scaled_template.shape[0]*1.5)), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
 
             if annotate:
-                notes_annotations.append((letter+str(octave),(x+scaled_template.shape[1]+staff.lines[0][0], int(y-scaled_template.shape[0]*0.2)+int(staff_top - vpadding * staff_height)),
+                notes_annotations.append((letter+str(octave), (x+scaled_template.shape[1]+staff.lines[0][0], int(y-scaled_template.shape[0]*0.2)+int(staff_top - vpadding * staff_height)),
                                                str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], int(y+scaled_template.shape[0]*1.5)+int(staff_top - vpadding * staff_height))))
 
-    cv2.imshow("Matches", match_image)
-    cv2.waitKey(0)
+    # cv2.imshow("Matches", match_image)
+    # cv2.waitKey(0)
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
@@ -262,3 +260,7 @@ def detect_notes(binary_img, staff, annotate=True):
 
     if annotate:
         return notes_annotations
+
+
+def detect_rests():
+    pass
