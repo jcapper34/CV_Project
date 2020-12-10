@@ -8,7 +8,7 @@ import wave
 
 SAMPLE_RATE = 44100
 QUARTER_DURATION = 0.4     # Duration of quarter note (sec)
-NOTE_STOP = 0.01            # Pause time between notes (sec)
+BETWEEN_NOTE_REST = 0.02            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
     "C":   [16.35, 32.70, 65.41, 130.81, 261.63, 523.25, 1046.50, 2093.00, 4186.01],
@@ -45,7 +45,16 @@ def play_sheet(staffs, group=2):
     for i in range(0, len(staffs), group):
         row_buffer = 0
         for staff in staffs[i:i+group]:
-            row_buffer += create_notes_buffer(staff.notes)
+            staff_buffer = create_notes_buffer(staff.notes)
+            # Add rest so that buffers are same length
+            if isinstance(row_buffer, np.ndarray):
+                size_d = len(row_buffer) - len(staff_buffer)
+                if size_d > 0:
+                    staff_buffer = np.append(staff_buffer, np.repeat(0, size_d, axis=0))
+                elif size_d < 0:
+                    row_buffer = np.append(row_buffer, np.repeat(0, -1*size_d, axis=0))
+
+            row_buffer += staff_buffer
 
         row_buffer = row_buffer * (2 ** 15 - 1) / np.max(np.abs(row_buffer))
 
@@ -122,6 +131,9 @@ def create_notes_buffer(notes, play=False):
 
         # Sine wave of note frequency
         audio_buffer = np.append(audio_buffer, np.sin(frequency * t * 2 * np.pi), axis=0)
+
+        # Add small rest between notes
+        audio_buffer = np.append(audio_buffer, np.repeat(0, BETWEEN_NOTE_REST*SAMPLE_RATE), axis=0)
 
     if play:
         audio_buffer *= (2 ** 15 - 1) / np.max(np.abs(audio_buffer))
