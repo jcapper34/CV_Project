@@ -134,8 +134,8 @@ def detect_staff_lines(binary_img):
         if num_spacings == 4:
             staffs.append(Staff(filtered_lines[start_i:i+1]))
 
-    cv2.imshow("Staff image", lines_img)
-    cv2.waitKey(0)
+    # cv2.imshow("Staff image", lines_img)
+    # cv2.waitKey(0)
 
     return staffs
 
@@ -187,7 +187,7 @@ def detect_notes(staff, annotate=True):
 
     # Get rid of staff lines
     kernel = np.ones((2, 1), np.uint8)
-    staff_image = cv2.morphologyEx(staff.binary_img, cv2.MORPH_CLOSE, kernel)
+    staff_image = cv2.morphologyEx(staff.gray_img, cv2.MORPH_CLOSE, kernel)
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
