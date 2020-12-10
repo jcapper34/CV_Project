@@ -24,17 +24,16 @@ def music_reader(filename):
     for staff in staffs:
         staff.make_subimage(gray_img)
 
-    staffs, clefs = detect_clefs(staffs)
+    staffs, clef_annotations = detect_clefs(staffs)
 
     # Draw an annotated image for debugging
     annotated_img = cv2.cvtColor(binary_img, cv2.COLOR_GRAY2BGR)
     for staff in staffs:
-        detect_rests(staff)
-        for s1, coord1, s2, coord2 in detect_notes(staff):
+        for s1, coord1, s2, coord2 in detect_notes(staff) + detect_rests(staff):
             annotated_img = cv2.putText(annotated_img, s1, coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
             annotated_img = cv2.putText(annotated_img, s2, coord2, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
 
-    for clef_num, coord in clefs:
+    for clef_num, coord in clef_annotations:
         x, y = coord
         if clef_num == 0:
             clef_name = "Treble"
@@ -44,15 +43,14 @@ def music_reader(filename):
         annotated_img = cv2.putText(annotated_img, clef_name, (round(x), round(y)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
 
     cv2.imshow("Annotated Image", annotated_img)
-
-    # audio = create_notes_buffer(staffs[1].notes+staffs[3].notes+staffs[5].notes, play=True)
-    play_sheet(staffs[:2])
-
     cv2.waitKey(0)
+
+    # audio = create_notes_buffer(staffs[0].notes+staffs[2].notes+staffs[4].notes, play=True)
+
+    # play_sheet(staffs, group=2)
 
 
 if __name__ == '__main__':
     # filename = os.path.join(REAL_IMG_DIR, 'twinkle-twinkle-little-star2.jpg')
     filename = os.path.join(MEDIA_DIR, 'old-macdonald.png')
     music_reader(filename)
-

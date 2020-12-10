@@ -140,8 +140,9 @@ def detect_staff_lines(binary_img):
     return staffs
 
 
-def detect_clefs(staffs):
-    C_THRESH = 0.65        # Template matching threshold
+def detect_clefs(staffs, annotate=True):
+    C_THRESH = 0.8        # Template matching threshold
+    tune_start, tune_stop, tune_step = 0.9, 1, 0.02     # Scale tuning variables
 
     # Read in clef templates as gray images
     treble_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'treble-clef.jpg'))
@@ -150,28 +151,40 @@ def detect_clefs(staffs):
     bass_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'bass-clef.jpg'))
     bass_template = cv2.cvtColor(bass_template, cv2.COLOR_BGR2GRAY)
 
-    clefs = []
+    clef_annotations = []
     for staff in staffs:
         staff_top = staff.lines[0][1]
 
         detected_clef = None
-        matched_clefs = []
-        # TODO: Slightly vary template scale until a sweet spot is found
+
+        # Try to match each clef template
         for clef_num, template in enumerate((treble_template, bass_template)):
-            scale = staff.binary_img.shape[0] / template.shape[0]
-            scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template to be same height as staff image
+            # Slightly tune template scaling until sweet spot is found
+            tune = tune_start
+            while tune < tune_stop:
+                scale = staff.binary_img.shape[0] / template.shape[0]
+                scale *= tune
 
-            c = cv2.matchTemplate(staff.gray_img, scaled_template, cv2.TM_CCOEFF_NORMED)   # Get template matching scores
-            _, max_val, _, max_loc = cv2.minMaxLoc(c)
+                scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template to be same height as staff image
 
-            if max_val > C_THRESH:
-                detected_clef = clef_num
-                clefs.append((detected_clef, (max_loc[0]+scaled_template.shape[0]+staff.lines[0][0]-60, max_loc[1]+staff_top-10)))
-                break
+                c = cv2.matchTemplate(staff.gray_img, scaled_template, cv2.TM_CCOEFF_NORMED)   # Get template matching scores
+                _, max_val, _, max_loc = cv2.minMaxLoc(c)
+
+                if max_val > C_THRESH:
+                    detected_clef = clef_num
+                    clef_annotations.append((detected_clef, (max_loc[0]+scaled_template.shape[0]+staff.lines[0][0]-60, max_loc[1]+staff_top-10)))
+                    break
+
+                tune += tune_step
+
+        assert detected_clef is not None, "Could not detect all clefs"
 
         staff.clef = detected_clef
 
-    return staffs, clefs
+    if annotate:
+        return staffs, clef_annotations
+
+    return staffs
 
 
 def detect_notes(staff, annotate=True):
@@ -231,24 +244,23 @@ def detect_notes(staff, annotate=True):
             letter, octave = staff.y_to_note(cy)
 
             if annotate:
-                x = int(x)
-                y = int(y)
+                x, y = int(x), int(y)
                 # Draw Rectangle around note
                 # cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 1)
 
                 font_scale = 0.6
                 # Write note value next to note
                 match_image = cv2.putText(match_image, letter + str(octave),
-                                          (x + scaled_template.shape[1], int(y - scaled_template.shape[0] * 0.2)),
+                                          (x + scaled_template.shape[1], round(y - scaled_template.shape[0] * 0.2)),
                                           cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0, 0, 255))
 
                 # Write number of counts next to note
                 match_image = cv2.putText(match_image, str(counts),
-                                          (x + scaled_template.shape[1], int(y + scaled_template.shape[0] * 1.5)),
+                                          (x + scaled_template.shape[1], round(y + scaled_template.shape[0] * 1.5)),
                                           cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0, 0, 255))
 
-                notes_annotations.append((letter+str(octave), (x+scaled_template.shape[1]+staff.lines[0][0], int(y-scaled_template.shape[0]*0.2)+int(staff_top - vpadding * staff_height)),
-                                               str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], int(y+scaled_template.shape[0]*1.5)+int(staff_top - vpadding * staff_height))))
+                notes_annotations.append((letter+str(octave), (x+scaled_template.shape[1]+staff.lines[0][0], round(y-scaled_template.shape[0]*0.2)+round(staff_top - vpadding * staff_height)),
+                                               str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], round(y+scaled_template.shape[0]*1.5)+round(staff_top - vpadding * staff_height))))
 
     # if annotate:
         # cv2.imshow("Matches", match_image)
@@ -263,7 +275,7 @@ def detect_notes(staff, annotate=True):
         return notes_annotations
 
 
-def detect_rests(staff):
+def detect_rests(staff, annotate=True):
     C_THRESH = 0.6  # Template matching threshold
 
     staff_top = staff.lines[0][1]
@@ -274,6 +286,7 @@ def detect_rests(staff):
         (cv2.imread(TEMPLATE_DIR + '/half-rest.jpg'), 2)
     ]
 
+    rest_annotations = []
     rests = []
     for template, counts in templates:
         # Create gray template
@@ -296,5 +309,17 @@ def detect_rests(staff):
             cy = y + scaled_template.shape[0]/2 + int(staff_top - Staff.vpadding * staff_height)
             rests.append((counts, (cx, cy)))
 
+            if annotate:
+                x, y = int(x), int(y)
+                rest_annotations.append(("Rest", (x + scaled_template.shape[1] + staff.lines[0][0],
+                                                                 round(y + scaled_template.shape[0] * 0.4) + round(
+                                                                     staff_top - Staff.vpadding * staff_height)),
+                                          str(counts), (x + scaled_template.shape[1] + staff.lines[0][0],
+                                                        round(y + scaled_template.shape[0] * 0.6) + round(
+                                                            staff_top - Staff.vpadding * staff_height))))
+
     staff.notes += rests
     staff.notes.sort(key=lambda note: note[1][0])   # Sort by x (left to right)
+
+    if annotate:
+        return rest_annotations
