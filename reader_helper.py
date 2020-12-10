@@ -51,7 +51,7 @@ def detect_staff_lines(binary_img):
     MAX_LINE_GAP = 40
     MAX_LINE_ANGLE = 1.0    # Degrees
     LINE_SPACE_VARIATION = 1
-
+    VERTICAL_LINE_GROUP = 1
 
     # TODO: Houghlines for thick staff lines
     # Find black lines with houghLinesP
@@ -67,25 +67,54 @@ def detect_staff_lines(binary_img):
         minLineLength=int(image_width * MIN_LINE_LENGTH_FRACTION),
         maxLineGap=MAX_LINE_GAP)
 
-    lines_img = np.full(binary_img.shape, 255, np.uint8)
-
     # Filter out lines that arent horizontal
     filtered_lines = []
     for line in lines:
         x1, y1, x2, y2 = line[0]
         line_angle = np.rad2deg(np.arctan2(y2-y1, x2-x1))
         if abs(line_angle) < MAX_LINE_ANGLE:
-            filtered_lines.append([x1, y1, x2, y2])
-            cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0), thickness=1)
+            filtered_lines.append((x1, y1, x2, y2))
 
     filtered_lines.sort(key=lambda x: x[1])     # Sort lines top to bottom
+
+    # Merge lines that are directly on top of each other. Accounts for thicker staff lines
+    i = 0
+    while i < len(filtered_lines):
+        line = filtered_lines[i]
+
+        nearby_lines = [line]
+        j = i
+        while j < len(filtered_lines)-1 and filtered_lines[j+1][1] - line[1] <= VERTICAL_LINE_GROUP:
+            line = filtered_lines[j]
+            nearby_lines.append(line)
+            j += 1
+
+        # Shift line up to make line y value average of vertically connected lines
+        y_shift = (sum([l[1] for l in nearby_lines]) / len(nearby_lines)) - line[1]
+        filtered_lines[i] = (line[0], line[1]+y_shift, line[2], line[3]+y_shift)
+
+        # Delete the other the vertically connected lines that aren't the original
+        for k in range(i, i+len(nearby_lines)-1):
+            filtered_lines.pop(k)
+
+        i += 1
+
+    # Draw Staff lines on blank image
+    lines_img = np.full(binary_img.shape, 255, np.uint8)
+    for x1, y1, x2, y2 in filtered_lines:
+        x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0), thickness=1)
+
+
+    cv2.imshow("Staff image", lines_img)
+    cv2.waitKey(0)
 
     # Group lines into staffs
     staffs = []
     i = 0
     while i < len(filtered_lines)-1:
         start_i = i
-        spacing = filtered_lines[i+1][1] - filtered_lines[i][1]
+        spacing = round(filtered_lines[i+1][1] - filtered_lines[i][1])
         while filtered_lines[i+1][1] - filtered_lines[i][1] in range(spacing-LINE_SPACE_VARIATION, spacing+LINE_SPACE_VARIATION+1): # If spacing is about equal
             i += 1
             if i+1 >= len(filtered_lines):
@@ -97,11 +126,8 @@ def detect_staff_lines(binary_img):
         if num_spacings == 4:
             staffs.append(Staff(filtered_lines[start_i: i+1]))
 
-    assert len(staffs) % 2 == 0, "Must have an even number of staffs"
-
-    # cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
-    # cv2.imshow("Staff image", lines_img)
-    # cv2.waitKey(0)
+    cv2.imshow("Staff image", lines_img)
+    cv2.waitKey(0)
 
     return staffs
 
@@ -119,6 +145,7 @@ def detect_clefs(binary_img, staffs):
     bass_template = cv2.cvtColor(bass_template, cv2.COLOR_BGR2GRAY)
     _, bass_template = cv2.threshold(bass_template, 127, 255, cv2.THRESH_BINARY)
 
+    clefs = []
     for staff in staffs:
         staff_top = staff.lines[0][1]
         staff_height = staff.lines[-1][1] - staff_top
@@ -136,79 +163,18 @@ def detect_clefs(binary_img, staffs):
 
             if max_val > C_THRESH:
                 detected_clef = clef_num
+                if detected_clef == 0:
+                    clef_name = "Treble"
+                else:
+                    clef_name = "Bass"
+                clefs.append((detected_clef, (max_loc[0]+scaled_template.shape[0]+staff.lines[0][0]-60, max_loc[1]+staff_top-10)))
 
         staff.clef = detected_clef
 
-        # cv2.imshow("Staff", staff_image)
-        # cv2.waitKey(0)
-
-    return staffs
+    return staffs, clefs
 
 
-# def detect_notes(gray_img, staff): # NEEDS to take in 1 staff objects at a time, cleff
-#     # Grabs the position of the lines in the staff and adds a buffer
-#     y1 = staff.lines[0][1]
-#     y5 = staff.lines[4][1]
-#     buffer_dif_y = int((y5 - y1))
-#     x_start = staff.lines[0][0]
-#     x_stop = staff.lines[0][2]
-#     buffer_dif_x = int((x_stop - x_start) / 15)
-#     crop_img = gray_img[y1 - buffer_dif_y:y5 + buffer_dif_y, x_start + buffer_dif_x:x_stop]
-#     staff.img = crop_img
-#     # Crop this area in sheet music image (bgr_img), slighty larger
-#
-#     # Showing for testing
-#     cv2.imshow("Cropped", crop_img)
-#     # cv2.waitKey(0)
-#
-#     # Get the binary image
-#     _, thresh_img = cv2.threshold(crop_img, 240, 255, cv2.THRESH_BINARY)  # Get rid of gray values (helps fill in notes)
-#
-#     # Perform openings/closings until notes are largest connected components
-#     kernel = np.ones((2, 1), np.uint8)
-#     filtered_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)  # Get rid of staff lines
-#     kernel = np.ones((1, 4), np.uint8)
-#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE,
-#                                     kernel)  # Get rid of horizontal lines (for eight and sixteenth notes)
-#     kernel = np.ones((5, 3), np.uint8)
-#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_OPEN, kernel)  # Fill in half and whole notes
-#     kernel = np.ones((5, 1), np.uint8)
-#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other horizontal lines
-#     kernel = np.ones((1, 4), np.uint8)
-#     filtered_img = cv2.morphologyEx(filtered_img, cv2.MORPH_CLOSE, kernel)  # Get rid of other vertical lines
-#     cv2.imshow("Filtered", filtered_img)  # TESTING
-#     cv2.waitKey(0)
-#     # Get coordinates of largest conenected componets (maybe check if they are relatively circular width is about = to height)
-#     # Order components by x-coord (L -> R)
-#
-#     # notes = []
-#     # For every component found
-#         # Compare area to templates of note values      <-- NOT SURE if we are considering this (worry about the rest first)
-#         # If no match, not a note
-#         # Else assign note value
-#
-#         # Check y coord of center
-#         # Compare to staff lines y-coords
-#         # Based on cleff
-#             # Assign note
-#
-#         # Add to some array
-#
-#
-#     # Add note array in
-#
-#     # padding = 0.5
-#     # for staff in staffs:
-#     #     staff_top = staff.lines[0][1]
-#     #     staff_height = staff.lines[-1][1] - staff_top
-#     #     staff_image = binary_img[int(staff_top - padding * staff_height):int(staff_top + staff_height + padding * staff_height),
-#     #                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
-#
-#
-#     return ""
-
-
-def detect_notes(gray_img, staff):
+def detect_notes(binary_img, staff, annotate=True):
     C_THRESH = 0.7
     vpadding = 0.5
     y_fudge = -1
@@ -216,7 +182,7 @@ def detect_notes(gray_img, staff):
     # Create subimage
     staff_top = staff.lines[0][1]
     staff_height = staff.lines[-1][1] - staff_top
-    staff_image = gray_img[
+    staff_image = binary_img[
                   int(staff_top - vpadding * staff_height):int(staff_top + staff_height + vpadding * staff_height),
                   staff.lines[0][0]:staff.lines[0][-2]]  # Create sub-image of staff
 
@@ -229,12 +195,16 @@ def detect_notes(gray_img, staff):
 
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
-        (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2)
+        (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
+        (cv2.imread(TEMPLATE_DIR+'/whole.jpg'), 4)
     ]
 
+    notes_annotations = []  # For drawing an annotated image
     notes = []  # ((x, y), counts)
     for template, counts in templates:
-        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)   # Grayscale the template
+        # Create Binary Template
+        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+        # _, template = cv2.threshold(template, 180, 255, cv2.THRESH_BINARY)
 
         # Scale template
         scale = (staff_height/4) / template.shape[0]
@@ -278,12 +248,17 @@ def detect_notes(gray_img, staff):
             # Write number of counts next to note
             match_image = cv2.putText(match_image, str(counts), (x+scaled_template.shape[1], int(y+scaled_template.shape[0]*1.5)), cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0,0,255))
 
-    # cv2.imshow("Matches", match_image)
-    # cv2.waitKey(0)
+            if annotate:
+                notes_annotations.append((letter+str(octave),(x+scaled_template.shape[1]+staff.lines[0][0], int(y-scaled_template.shape[0]*0.2)+int(staff_top - vpadding * staff_height)),
+                                               str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], int(y+scaled_template.shape[0]*1.5)+int(staff_top - vpadding * staff_height))))
+
+    cv2.imshow("Matches", match_image)
+    cv2.waitKey(0)
 
     notes.sort(key=lambda note: note[0][0])     # Sort notes by x value (left to right)
 
     notes = [(*staff.y_to_note(coord[1]), counts) for coord, counts in notes]   # Notes defined by letter and counts
     staff.notes = notes
 
-
+    if annotate:
+        return notes_annotations
