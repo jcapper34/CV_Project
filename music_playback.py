@@ -4,6 +4,7 @@ Description: This file contains functions to play audio of read-in sheet music
 
 import numpy as np
 import simpleaudio as sa
+import wave
 
 SAMPLE_RATE = 44100
 QUARTER_DURATION = 0.4     # Duration of quarter note (sec)
@@ -35,7 +36,7 @@ def get_frequency(letter, octave, accidental):
     elif accidental is not None:
         letter += accidental
 
-    return NOTE_FREQUENCIES[letter][octave+1]
+    return NOTE_FREQUENCIES[letter][octave]
 
 
 # Assumes that staffs are grouped in pairs
@@ -44,12 +45,12 @@ def play_sheet(staffs, group=2):
     for i in range(0, len(staffs), group):
         row_buffer = 0
         for staff in staffs[i:i+group]:
-            row_buffer += create_note_buffer(staff.notes)
+            row_buffer += create_notes_buffer(staff.notes)
 
         row_buffer = row_buffer * (2 ** 15 - 1) / np.max(np.abs(row_buffer))
 
-        # play_obj = sa.play_buffer(row_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
-        # play_obj.wait_done()
+        play_obj = sa.play_buffer(row_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
+        play_obj.wait_done()
 
         audio_buffer = np.append(audio_buffer, row_buffer.astype(np.int16), axis=0)
 
@@ -103,13 +104,21 @@ def play_notes(notes):
     play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
     play_obj.wait_done()
 
+    return audio
+
 
 # Needs to be edited to use annotations
-def create_note_buffer(notes):
+def create_notes_buffer(notes, play=False):
     audio_buffer = np.array([])
-    for letter, octave, counts in notes:
-        duration = counts * QUARTER_DURATION
-        frequency = get_frequency(letter, octave, None)
+    for value, _ in notes:
+        if isinstance(value, tuple):    # This means it is a note
+            letter, octave, counts = value
+            duration = counts * QUARTER_DURATION
+            frequency = get_frequency(letter, octave, None)
+        else:   # This means it is a rest
+            counts = value
+            duration = counts * QUARTER_DURATION
+            frequency = 0
 
         # Time array
         t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
@@ -117,12 +126,17 @@ def create_note_buffer(notes):
         # Sine wave of note frequency
         audio_buffer = np.append(audio_buffer, np.sin(frequency * t * 2 * np.pi), axis=0)
 
+    if play:
+        audio_buffer *= (2 ** 15 - 1) / np.max(np.abs(audio_buffer))
+        play_obj = sa.play_buffer(audio_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
+        play_obj.wait_done()
+
     return audio_buffer
 
 
 if __name__ == '__main__':
     # Mary Had a Little Lamb
-    play_notes([
+    audio = play_notes([
         [('E', 5, None, 1), ('C', 4, None, 1)],
         [('D', 5, None, 1), ('E', 4, None, 1)],
         [('C', 5, None, 1), ('G', 4, None, 1)],
@@ -137,6 +151,14 @@ if __name__ == '__main__':
         [('G', 5, None, 1), ('E', 4, None, 1)],
         [('G', 5, None, 2), [('G', 4, None, 1), ('E', 4, None, 1)]],
     ])
+
+    # Write audio to file
+    # obj = wave.open('mary-had-a-little-lamb.wav', 'wb')
+    # obj.setnchannels(1)  # mono
+    # obj.setsampwidth(2)
+    # obj.setframerate(SAMPLE_RATE)
+    # obj.writeframesraw(audio)
+    # obj.close()
 
     # # All Along the Watchtower
     # # Sharps are C, D, F, G
