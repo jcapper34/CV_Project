@@ -49,62 +49,59 @@ def play_sheet(staffs, group=2):
 
         row_buffer = row_buffer * (2 ** 15 - 1) / np.max(np.abs(row_buffer))
 
-        play_obj = sa.play_buffer(row_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
-        play_obj.wait_done()
-
         audio_buffer = np.append(audio_buffer, row_buffer.astype(np.int16), axis=0)
 
     play_obj = sa.play_buffer(audio_buffer.astype(np.int16), 1, 2, SAMPLE_RATE)
     play_obj.wait_done()
 
 
-"""
-Takes in a sequence of note groups.
--> Each note group contains a list of notes to be played at that time
--> -> Each note is represented by a tuple in the form (letter, octave, accidental, duration)
--> -> Exception: if the note is a rest, then it is just be represented by the duration value
--> -> -> Accidental should be '#' for sharp, 'b' for flat, and None if no accidental
-"""
-def play_notes(notes):
-    audio = np.array([], dtype=np.int16)
-    for note_group in notes:
-        note_group = note_group if isinstance(note_group, list) else [note_group]  # Make sure it's a list
-
-        note_wave = 0
-        for part in note_group:
-            part = part if isinstance(part, list) else [part]   # Make sure it's a list
-            part_wave = np.array([])
-            for note in part:
-                if isinstance(note, tuple):
-                    letter, octave, accidental, counts = note
-                    duration = counts*QUARTER_DURATION
-                    frequency = get_frequency(letter, octave, accidental)
-
-                    # Create sampled time range
-                    t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
-
-                    # Sine wave of note frequency
-                    part_wave = np.append(part_wave, np.sin(frequency * t * 2 * np.pi), axis=0)
-
-                else: # This means it is a rest
-                    duration = note
-                    part_wave = np.append(part_wave, np.repeat(0, duration * SAMPLE_RATE), axis=0)
-
-            # Add pause time between notes
-            part_wave = np.append(part_wave, np.repeat(0, NOTE_STOP * SAMPLE_RATE), axis=0)
-
-            note_wave += part_wave
-
-        # Put everything in a 16 bit range where the max is 2^15-1
-        note_audio = note_wave * (2**15 - 1) / np.max(np.abs(note_wave))
-
-        audio = np.append(audio, note_audio.astype(np.int16), axis=0)    # Add note to buffer
-
-    # Start playback
-    play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
-    play_obj.wait_done()
-
-    return audio
+# """
+# Takes in a sequence of note groups.
+# -> Each note group contains a list of notes to be played at that time
+# -> -> Each note is represented by a tuple in the form (letter, octave, accidental, duration)
+# -> -> Exception: if the note is a rest, then it is just be represented by the duration value
+# -> -> -> Accidental should be '#' for sharp, 'b' for flat, and None if no accidental
+# """
+# def play_notes(notes):
+#     audio = np.array([], dtype=np.int16)
+#     for note_group in notes:
+#         note_group = note_group if isinstance(note_group, list) else [note_group]  # Make sure it's a list
+#
+#         note_wave = 0
+#         for part in note_group:
+#             part = part if isinstance(part, list) else [part]   # Make sure it's a list
+#             part_wave = np.array([])
+#             for note in part:
+#                 if isinstance(note, tuple):
+#                     letter, octave, accidental, counts = note
+#                     duration = counts*QUARTER_DURATION
+#                     frequency = get_frequency(letter, octave, accidental)
+#
+#                     # Create sampled time range
+#                     t = np.linspace(0, duration, int(duration * SAMPLE_RATE), False)
+#
+#                     # Sine wave of note frequency
+#                     part_wave = np.append(part_wave, np.sin(frequency * t * 2 * np.pi), axis=0)
+#
+#                 else: # This means it is a rest
+#                     duration = note
+#                     part_wave = np.append(part_wave, np.repeat(0, duration * SAMPLE_RATE), axis=0)
+#
+#             # Add pause time between notes
+#             part_wave = np.append(part_wave, np.repeat(0, NOTE_STOP * SAMPLE_RATE), axis=0)
+#
+#             note_wave += part_wave
+#
+#         # Put everything in a 16 bit range where the max is 2^15-1
+#         note_audio = note_wave * (2**15 - 1) / np.max(np.abs(note_wave))
+#
+#         audio = np.append(audio, note_audio.astype(np.int16), axis=0)    # Add note to buffer
+#
+#     # Start playback
+#     play_obj = sa.play_buffer(audio, 1, 2, SAMPLE_RATE)
+#     play_obj.wait_done()
+#
+#     return audio
 
 
 # Needs to be edited to use annotations
