@@ -22,14 +22,14 @@ def music_reader(filename):
 
     staffs = detect_staff_lines(binary_img)
     for staff in staffs:
-        staff.make_subimg(gray_img)
-
+        staff.make_subimage(gray_img)
 
     staffs, clefs = detect_clefs(staffs)
 
     # Draw an annotated image for debugging
     annotated_img = cv2.cvtColor(binary_img, cv2.COLOR_GRAY2BGR)
     for staff in staffs:
+        detect_rests(staff)
         for s1, coord1, s2, coord2 in detect_notes(staff):
             annotated_img = cv2.putText(annotated_img, s1, coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
             annotated_img = cv2.putText(annotated_img, s2, coord2, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
@@ -44,11 +44,11 @@ def music_reader(filename):
         annotated_img = cv2.putText(annotated_img, clef_name, (round(x), round(y)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
 
     cv2.imshow("Annotated Image", annotated_img)
+
+    # audio = create_notes_buffer(staffs[1].notes+staffs[3].notes+staffs[5].notes, play=True)
+    play_sheet(staffs[:2])
+
     cv2.waitKey(0)
-
-    # audio = create_notes_buffer(staffs[1].notes+staffs[3].notes, play=True)
-
-    # play_sheet(staffs)
 
 
 if __name__ == '__main__':
