@@ -7,6 +7,11 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
 BINARY_THRESH = 190
 
+# Template Matching Thresholds
+CLEF_THRESH = 0.8
+NOTE_THRESH = 0.7
+REST_THRESH = 0.7
+
 
 class Staff:
     vpadding = 0.5
@@ -141,7 +146,6 @@ def detect_staff_lines(binary_img):
 
 
 def detect_clefs(staffs, annotate=True):
-    C_THRESH = 0.8        # Template matching threshold
     tune_start, tune_stop, tune_step = 0.9, 1, 0.02     # Scale tuning variables
 
     # Read in clef templates as gray images
@@ -170,7 +174,7 @@ def detect_clefs(staffs, annotate=True):
                 c = cv2.matchTemplate(staff.gray_img, scaled_template, cv2.TM_CCOEFF_NORMED)   # Get template matching scores
                 _, max_val, _, max_loc = cv2.minMaxLoc(c)
 
-                if max_val > C_THRESH:
+                if max_val > CLEF_THRESH:
                     detected_clef = clef_num
                     clef_annotations.append((detected_clef, (max_loc[0]+scaled_template.shape[0]+staff.lines[0][0]-60, max_loc[1]+staff_top-10)))
                     break
@@ -188,8 +192,6 @@ def detect_clefs(staffs, annotate=True):
 
 
 def detect_notes(staff, annotate=True):
-    C_THRESH = 0.7
-    vpadding = 0.5
     y_fudge = -1
 
     staff_top = staff.lines[0][1]
@@ -221,7 +223,7 @@ def detect_notes(staff, annotate=True):
         c = cv2.matchTemplate(staff_image, scaled_template, cv2.TM_CCOEFF_NORMED)
 
         # Get all points at threshold
-        _, thresh_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
+        _, thresh_img = cv2.threshold(c, thresh=NOTE_THRESH, maxval=255, type=cv2.THRESH_BINARY)
         thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
 
         # Close note blobs
@@ -259,8 +261,8 @@ def detect_notes(staff, annotate=True):
                                           (x + scaled_template.shape[1], round(y + scaled_template.shape[0] * 1.5)),
                                           cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0, 0, 255))
 
-                notes_annotations.append((letter+str(octave), (x+scaled_template.shape[1]+staff.lines[0][0], round(y-scaled_template.shape[0]*0.2)+round(staff_top - vpadding * staff_height)),
-                                               str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], round(y+scaled_template.shape[0]*1.5)+round(staff_top - vpadding * staff_height))))
+                notes_annotations.append((letter+str(octave), (x+scaled_template.shape[1]+staff.lines[0][0], round(y-scaled_template.shape[0]*0.2)+round(staff_top - Staff.vpadding * staff_height)),
+                                               str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], round(y+scaled_template.shape[0]*1.5)+round(staff_top - Staff.vpadding * staff_height))))
 
     # if annotate:
         # cv2.imshow("Matches", match_image)
@@ -276,7 +278,7 @@ def detect_notes(staff, annotate=True):
 
 
 def detect_rests(staff, annotate=True):
-    C_THRESH = 0.6  # Template matching threshold
+    tune_start, tune_stop, tune_step = 0.9, 1, 0.02     # Scale tuning variables
 
     staff_top = staff.lines[0][1]
     staff_height = staff.lines[-1][1] - staff_top
@@ -292,16 +294,28 @@ def detect_rests(staff, annotate=True):
         # Create gray template
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
-        scale = staff.gray_img.shape[0] / template.shape[0]
-        scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template to be same height as staff image
+        # Scale base
+        scale_base = staff.gray_img.shape[0] / template.shape[0]    # Makes template the same height as staff image
 
-        c = cv2.matchTemplate(staff.gray_img, scaled_template, cv2.TM_CCOEFF_NORMED)
+        # Find best scaling factor for template
+        score_matrices = []    # Max score at each scale
+        tune = tune_start
+        while tune < tune_stop:
+            scale = scale_base * tune
+
+            scaled_temp = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template
+
+            c = cv2.matchTemplate(staff.gray_img, scaled_temp, cv2.TM_CCOEFF_NORMED)
+            score_matrices.append((scaled_temp, c))
+            tune += tune_step
+
+        scaled_template, c = max(score_matrices, key=lambda x: np.amax(x[1]))     # Get score matrix with highest max
 
         # Get all points at threshold
-        _, thresh_img = cv2.threshold(c, thresh=C_THRESH, maxval=255, type=cv2.THRESH_BINARY)
+        _, thresh_img = cv2.threshold(c, thresh=REST_THRESH, maxval=255, type=cv2.THRESH_BINARY)
         thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
 
-        _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)
+        _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)   # Get centroids of connected components
 
         for x, y in centroids[1::]:
             # Get note center
@@ -309,6 +323,7 @@ def detect_rests(staff, annotate=True):
             cy = y + scaled_template.shape[0]/2 + int(staff_top - Staff.vpadding * staff_height)
             rests.append((counts, (cx, cy)))
 
+            # Provide annotations of note
             if annotate:
                 x, y = int(x), int(y)
                 rest_annotations.append(("Rest", (x + scaled_template.shape[1] + staff.lines[0][0],
