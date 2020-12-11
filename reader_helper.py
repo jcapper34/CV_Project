@@ -8,7 +8,7 @@ from music_reader import MEDIA_DIR, TEMPLATE_DIR
 BINARY_THRESH = 190
 
 # Template Matching Thresholds
-CLEF_THRESH = 0.8
+CLEF_THRESH = 0.75
 NOTE_THRESH = 0.7
 REST_THRESH = 0.7
 
@@ -28,7 +28,7 @@ class Staff:
     def make_subimage(self, gray_img):
         staff_top = self.lines[0][1]
         staff_height = self.lines[-1][1] - staff_top
-        self.gray_img = gray_img[int(staff_top - self.vpadding * staff_height):int(
+        self.gray_img = gray_img[round(staff_top - self.vpadding * staff_height):round(
             staff_top + staff_height + self.vpadding * staff_height),
                       self.lines[0][0]:self.lines[0][-2]]  # Create sub-image of staff
 
@@ -139,8 +139,8 @@ def detect_staff_lines(binary_img):
         if num_spacings == 4:
             staffs.append(Staff(filtered_lines[start_i:i+1]))
 
-    # cv2.imshow("Staff image", lines_img)
-    # cv2.waitKey(0)
+    cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
+    cv2.waitKey(0)
 
     return staffs
 
@@ -207,7 +207,7 @@ def detect_notes(staff, annotate=True):
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
         (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
-        (cv2.imread(TEMPLATE_DIR+'/whole.jpg'), 4)
+        (cv2.imread(TEMPLATE_DIR+'/whole-note.jpg'), 4)
     ]
 
     notes_annotations = []  # For drawing an annotated image
@@ -261,8 +261,8 @@ def detect_notes(staff, annotate=True):
                                           (x + scaled_template.shape[1], round(y + scaled_template.shape[0] * 1.5)),
                                           cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0, 0, 255))
 
-                notes_annotations.append((letter+str(octave), (x+scaled_template.shape[1]+staff.lines[0][0], round(y-scaled_template.shape[0]*0.2)+round(staff_top - Staff.vpadding * staff_height)),
-                                               str(counts), (x+scaled_template.shape[1]+staff.lines[0][0], round(y+scaled_template.shape[0]*1.5)+round(staff_top - Staff.vpadding * staff_height))))
+                notes_annotations.append((letter+str(octave), (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y-scaled_template.shape[0]*0.2)+round(staff_top - Staff.vpadding * staff_height)),
+                                               str(counts), (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y+scaled_template.shape[0]*1.5)+round(staff_top - Staff.vpadding * staff_height))))
 
     # if annotate:
         # cv2.imshow("Matches", match_image)
@@ -275,6 +275,50 @@ def detect_notes(staff, annotate=True):
 
     if annotate:
         return notes_annotations
+
+
+def detect_eighth_notes(staff):
+    MIN_HOUGH_VOTES_FRACTION = 0.5
+    MIN_LINE_LENGTH_FRACTION = 1/80
+    EDGE_THRESH = 0.05
+
+    staff_image = staff.binary_img
+    # for x1, y1, x2, y2 in staff.lines:
+    #     staff_top = staff.lines[0][1]
+    #     staff_height = staff.lines[-1][1] - staff_top
+    #     y_shift = staff_top - Staff.vpadding * staff_height
+    #     cv2.line(staff_image, (round(x1), round(y1-y_shift)), (round(x2), round(y2-y_shift)), (255,255,255), thickness=2)
+
+    # cv2.imshow("No Staff Lines", staff_image)
+    # cv2.waitKey(0)
+    edge_img = cv2.Canny(staff_image,
+                         apertureSize=3,
+                         threshold1=EDGE_THRESH,
+                         threshold2=EDGE_THRESH*3,
+                         L2gradient=True)
+    cv2.imshow("Edges", edge_img)
+    cv2.waitKey(0)
+
+    image_width = staff.binary_img.shape[1]
+
+    lines = cv2.HoughLinesP(
+        image=edge_img,
+        rho=5,
+        theta=math.pi / 180,
+        threshold=int(image_width * MIN_HOUGH_VOTES_FRACTION),
+        lines=None,
+        minLineLength=int(image_width * MIN_LINE_LENGTH_FRACTION),
+        maxLineGap=30)
+
+    if lines is not None:
+        lines_img = np.full(staff.binary_img.shape, 255, np.uint8)
+
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0))
+
+        cv2.imshow("Note Connectors", lines_img)
+        cv2.waitKey(0)
 
 
 def detect_rests(staff, annotate=True):
@@ -326,10 +370,10 @@ def detect_rests(staff, annotate=True):
             # Provide annotations of note
             if annotate:
                 x, y = int(x), int(y)
-                rest_annotations.append(("Rest", (x + scaled_template.shape[1] + staff.lines[0][0],
+                rest_annotations.append(("Rest", (round(x + scaled_template.shape[1] + staff.lines[0][0]),
                                                                  round(y + scaled_template.shape[0] * 0.4) + round(
                                                                      staff_top - Staff.vpadding * staff_height)),
-                                          str(counts), (x + scaled_template.shape[1] + staff.lines[0][0],
+                                          str(counts), (round(x + scaled_template.shape[1] + staff.lines[0][0]),
                                                         round(y + scaled_template.shape[0] * 0.6) + round(
                                                             staff_top - Staff.vpadding * staff_height))))
 
@@ -338,3 +382,4 @@ def detect_rests(staff, annotate=True):
 
     if annotate:
         return rest_annotations
+
