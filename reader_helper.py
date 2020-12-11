@@ -128,7 +128,7 @@ def detect_staff_lines(binary_img):
     while i < len(filtered_lines)-1:
         start_i = i
         spacing = round(filtered_lines[i+1][1] - filtered_lines[i][1])
-        while filtered_lines[i+1][1] - filtered_lines[i][1] in range(spacing-LINE_SPACE_VARIATION, spacing+LINE_SPACE_VARIATION+1): # If spacing is about equal
+        while filtered_lines[i+1][1] - filtered_lines[i][1] in range(int(spacing)-LINE_SPACE_VARIATION, int(spacing)+LINE_SPACE_VARIATION+1): # If spacing is about equal
             i += 1
             if i+1 >= len(filtered_lines):
                 break
