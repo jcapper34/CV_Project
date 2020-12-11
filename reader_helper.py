@@ -207,7 +207,7 @@ def detect_notes(staff, annotate=True):
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
         (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
-        (cv2.imread(TEMPLATE_DIR+'/whole.jpg'), 4)
+        (cv2.imread(TEMPLATE_DIR+'/whole-note.jpg'), 4)
     ]
 
     notes_annotations = []  # For drawing an annotated image
