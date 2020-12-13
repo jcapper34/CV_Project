@@ -11,7 +11,7 @@ BINARY_THRESH = 180
 CLEF_THRESH = 0.75
 NOTE_THRESH = 0.7
 REST_THRESH = 0.7
-ANNOTATION_THRESH = 0.75
+ACCIDENTAL_THRESH = 0.75
 
 MARKUP_FONT_SIZE = 0.6
 
@@ -27,7 +27,7 @@ class Staff:
         self.clef_dim = None        # Dimensions of clef so it can be cropped out
         self.clef_loc = None        # Location of clef (relative to staff image) so it can be cropped out
 
-        # Signature Annotations
+        # Signature accidentals
         self.sharps = []
         self.flats = []
 
@@ -61,7 +61,15 @@ class Staff:
 
         note_change = round((y-staff_top) / note_spacing)
 
-        return ref[int(note_change)]
+        letter, octave = ref[int(note_change)]
+
+        accidental = None
+        if letter in self.sharps:
+            accidental = '#'
+        elif letter in self.flats:
+            accidental = 'b'
+
+        return letter, accidental, octave
 
     def __str__(self):
         return ("Staff:\n" +
@@ -262,7 +270,8 @@ def detect_notes(staff, markup_image):
             cy = y + scaled_template.shape[0]/2 + int(staff_top - Staff.vpadding * staff_height)
             notes.append(((cx, cy), counts))
 
-            letter, octave = staff.y_to_note(cy)
+            letter, accidental, octave = staff.y_to_note(cy)
+            accidental_str = accidental if accidental is not None else ''
 
             x, y = int(x), int(y)
             # Draw Rectangle around note
@@ -271,7 +280,7 @@ def detect_notes(staff, markup_image):
             text_coord1 = (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y-scaled_template.shape[0]*0.2 + staff_top - Staff.vpadding * staff_height))
             text_coord2 = (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y+scaled_template.shape[0]*1.5 + staff_top - Staff.vpadding * staff_height))
 
-            markup_image = cv2.putText(markup_image, letter+str(octave), text_coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
+            markup_image = cv2.putText(markup_image, letter+accidental_str+str(octave), text_coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
             markup_image = cv2.putText(markup_image, str(counts), text_coord2, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
 
     # cv2.imshow("Matches", match_image)
@@ -377,7 +386,7 @@ def detect_rests(staff, markup_image):
             cy = y + scaled_template.shape[0]/2 + int(staff_top - Staff.vpadding * staff_height)
             rests.append((counts, (cx, cy)))
 
-            # Provide annotations of note
+            # Write information on markup image
             text_coord1 = (round(x + scaled_template.shape[1] + staff.lines[0][0]),
                                                              round(y + scaled_template.shape[0] * 0.4) + round(
                                                                  staff_top - Staff.vpadding * staff_height))
@@ -393,7 +402,7 @@ def detect_rests(staff, markup_image):
     return markup_image
 
 
-def detect_signature_annotations(staff, markup_image):
+def detect_signature_accidentals(staff, markup_image):
     tune_start, tune_stop, tune_step = 0.8, 1.2, 0.02  # Variables for scale tunes
 
     # Staff dimensions
@@ -402,8 +411,8 @@ def detect_signature_annotations(staff, markup_image):
     staff_line_spacing = staff_height/4
 
     templates = [
-        (cv2.imread(TEMPLATE_DIR + '/sharp.jpg'), 0),
-        (cv2.imread(TEMPLATE_DIR + '/flat.jpg'), 1),
+        (cv2.imread(TEMPLATE_DIR + '/sharp.jpg'), '#'),
+        (cv2.imread(TEMPLATE_DIR + '/flat.jpg'), 'b'),
     ]
 
     # Get rid of staff lines
@@ -413,7 +422,7 @@ def detect_signature_annotations(staff, markup_image):
     # Make subimage of just staff signatures
     signature_image = staff_image[:, staff.clef_loc[0]+staff.clef_dim[1]:staff.clef_loc[0]+2*staff.clef_dim[1]]
 
-    for template, annotation_num in templates:
+    for template, accidental in templates:
         # Create gray template
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
@@ -435,28 +444,26 @@ def detect_signature_annotations(staff, markup_image):
         scaled_template, c = max(scores_images, key=lambda x: np.amax(x[1]))    # Get score matrix with highest max val
 
         # Get all points at threshold
-        _, thresh_img = cv2.threshold(c, thresh=ANNOTATION_THRESH, maxval=255, type=cv2.THRESH_BINARY)
+        _, thresh_img = cv2.threshold(c, thresh=ACCIDENTAL_THRESH, maxval=255, type=cv2.THRESH_BINARY)
         thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
 
         _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)   # Get centroids of connected components
 
         for x, y in centroids[1::]:
-            # Get annotations location
+            # Get accidentals location
             cx = x + scaled_template.shape[1]/2
             cy = y + scaled_template.shape[0]/2 + int(staff_top - Staff.vpadding * staff_height)
 
             # Find the note letter corresponding to that y value
             letter = staff.y_to_note(cy)[0]
 
-            if annotation_num == 0:
+            if accidental == '#':
                 staff.sharps.append(letter)  # Add letter to staffs sharps list
-                annotation = letter+"# sig"
-            else:
+            elif accidental == 'b':
                 staff.flats.append(letter)  # Add letter to staffs flats list
-                annotation = letter+"# sig"
 
-            # Write annotation information on markup image
+            # Write accidental information on markup image
             text_coord = (round(cx+scaled_template.shape[1]+staff.lines[0][0]+signature_image.shape[1]), round(y-scaled_template.shape[0]*0.2 + staff_top - Staff.vpadding * staff_height))
-            cv2.putText(markup_image, annotation, text_coord, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0, 0, 255))
+            cv2.putText(markup_image, letter+accidental, text_coord, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0, 0, 255))
 
     return markup_image

@@ -28,7 +28,7 @@ def music_reader(filename):
     staffs, markup_image = detect_clefs(staffs, markup_image)
 
     for staff in staffs:
-        markup_image = detect_signature_annotations(staff, markup_image)
+        markup_image = detect_signature_accidentals(staff, markup_image)
         markup_image = detect_notes(staff, markup_image)
         markup_image = detect_rests(staff, markup_image)
 

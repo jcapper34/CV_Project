@@ -7,8 +7,8 @@ import simpleaudio as sa
 import wave
 
 SAMPLE_RATE = 44100
-QUARTER_DURATION = 0.4     # Duration of quarter note (sec)
-BETWEEN_NOTE_REST = 0.02            # Pause time between notes (sec)
+COUNT_DURATION = 0.4     # Duration of quarter note (sec)
+BETWEEN_NOTE_REST = 0.01            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
     "C":   [16.35, 32.70, 65.41, 130.81, 261.63, 523.25, 1046.50, 2093.00, 4186.01],
@@ -118,12 +118,12 @@ def create_notes_buffer(notes, play=False):
     audio_buffer = np.array([])
     for value, _ in notes:
         if isinstance(value, tuple):    # This means it is a note
-            letter, octave, counts = value
-            duration = counts * QUARTER_DURATION
-            frequency = get_frequency(letter, octave, None)
+            letter, annotation, octave, counts = value
+            duration = counts * COUNT_DURATION
+            frequency = get_frequency(letter, octave, annotation)
         else:   # This means it is a rest
             counts = value
-            duration = counts * QUARTER_DURATION
+            duration = counts * COUNT_DURATION
             frequency = 0
 
         # Time array
@@ -143,23 +143,23 @@ def create_notes_buffer(notes, play=False):
     return audio_buffer
 
 
-if __name__ == '__main__':
+# if __name__ == '__main__':
     # Mary Had a Little Lamb
-    audio = play_notes([
-        [('E', 5, None, 1), ('C', 4, None, 1)],
-        [('D', 5, None, 1), ('E', 4, None, 1)],
-        [('C', 5, None, 1), ('G', 4, None, 1)],
-        [('D', 5, None, 1), ('E', 4, None, 1)],
-        [('E', 5, None, 1), ('C', 4, None, 1)],
-        [('E', 5, None, 1), ('E', 4, None, 1)],
-        [('E', 5, None, 2), [('C', 4, None, 1), ('D', 4, None, 1)]],
-        [('D', 5, None, 1), ('G', 3, None, 1)],
-        [('D', 5, None, 1), ('B', 3, None, 1)],
-        [('D', 5, None, 2), [('D', 4, None, 1), ('B', 3, None, 1)]],
-        [('E', 5, None, 1), ('C', 4, None, 1)],
-        [('G', 5, None, 1), ('E', 4, None, 1)],
-        [('G', 5, None, 2), [('G', 4, None, 1), ('E', 4, None, 1)]],
-    ])
+    # audio = play_notes([
+    #     [('E', 5, None, 1), ('C', 4, None, 1)],
+    #     [('D', 5, None, 1), ('E', 4, None, 1)],
+    #     [('C', 5, None, 1), ('G', 4, None, 1)],
+    #     [('D', 5, None, 1), ('E', 4, None, 1)],
+    #     [('E', 5, None, 1), ('C', 4, None, 1)],
+    #     [('E', 5, None, 1), ('E', 4, None, 1)],
+    #     [('E', 5, None, 2), [('C', 4, None, 1), ('D', 4, None, 1)]],
+    #     [('D', 5, None, 1), ('G', 3, None, 1)],
+    #     [('D', 5, None, 1), ('B', 3, None, 1)],
+    #     [('D', 5, None, 2), [('D', 4, None, 1), ('B', 3, None, 1)]],
+    #     [('E', 5, None, 1), ('C', 4, None, 1)],
+    #     [('G', 5, None, 1), ('E', 4, None, 1)],
+    #     [('G', 5, None, 2), [('G', 4, None, 1), ('E', 4, None, 1)]],
+    # ])
 
     # Write audio to file
     # obj = wave.open('mary-had-a-little-lamb.wav', 'wb')
