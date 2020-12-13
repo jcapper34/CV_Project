@@ -15,42 +15,42 @@ def music_reader(filename):
     # bgr_img = find_sheet_music(bgr_img)   # COMMENT OUT to use music from MEDIA_DIR
 
     gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-    _, binary_img = cv2.threshold(gray_img, BINARY_THRESH, 255, cv2.THRESH_BINARY)  # TODO: could adjust threshold, maybe figure out dynamic threshold approach
+    _, binary_img = cv2.threshold(gray_img, BINARY_THRESH, 255, type=cv2.THRESH_BINARY)  # TODO: could adjust threshold, maybe figure out dynamic threshold approach
 
     # cv2.imshow("Image", binary_img)
     # cv2.waitKey(0)
 
-    staffs = detect_staff_lines(binary_img)
+    staffs = detect_staffs(binary_img)
     for staff in staffs:
         staff.make_subimage(gray_img)
 
-    staffs, clef_annotations = detect_clefs(staffs)
+    markup_image = cv2.cvtColor(binary_img, cv2.COLOR_GRAY2BGR)
+    staffs, markup_image = detect_clefs(staffs, markup_image)
 
-    # Draw an annotated image for debugging
-    annotated_img = cv2.cvtColor(binary_img, cv2.COLOR_GRAY2BGR)
     for staff in staffs:
-        for s1, coord1, s2, coord2 in detect_notes(staff) + detect_rests(staff):
-            annotated_img = cv2.putText(annotated_img, s1, coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
-            annotated_img = cv2.putText(annotated_img, s2, coord2, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
+        markup_image = detect_signature_annotations(staff, markup_image)
+        markup_image = detect_notes(staff, markup_image)
+        markup_image = detect_rests(staff, markup_image)
 
-    for clef_num, coord in clef_annotations:
-        x, y = coord
-        if clef_num == 0:
-            clef_name = "Treble"
-        else:
-            clef_name = "Bass"
+    # for clef_num, coord in clef_markup:
+    #     x, y = coord
+    #     if clef_num == 0:
+    #         clef_name = "Treble"
+    #     else:
+    #         clef_name = "Bass"
+    #
+    #     markup_image = cv2.putText(markup_image, clef_name, (round(x), round(y)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
 
-        annotated_img = cv2.putText(annotated_img, clef_name, (round(x), round(y)), cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.6, (0,0,255))
-
-    cv2.imshow("Annotated Image", annotated_img)
+    cv2.imshow("Marked-Up Image", markup_image)
     cv2.waitKey(0)
 
     # audio = create_notes_buffer(staffs[0].notes+staffs[2].notes+staffs[4].notes, play=True)
 
-    # play_sheet(staffs, group=2)
+    play_sheet(staffs, group=2)
 
 
 if __name__ == '__main__':
-    # filename = os.path.join(REAL_IMG_DIR, 'twinkle-twinkle-little-star2.jpg')
+    # filename = os.path.join(REAL_IMG_DIR, 'img01.jpg')
     filename = os.path.join(MEDIA_DIR, 'old-macdonald.png')
+
     music_reader(filename)

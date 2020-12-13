@@ -5,12 +5,15 @@ import os
 import numpy as np
 from music_reader import MEDIA_DIR, TEMPLATE_DIR
 
-BINARY_THRESH = 190
+BINARY_THRESH = 180
 
 # Template Matching Thresholds
 CLEF_THRESH = 0.75
 NOTE_THRESH = 0.7
 REST_THRESH = 0.7
+ANNOTATION_THRESH = 0.75
+
+MARKUP_FONT_SIZE = 0.6
 
 
 class Staff:
@@ -18,11 +21,17 @@ class Staff:
 
     def __init__(self, lines):
         self.lines = lines
-        self.notes = []     # (value(letter, octave, counts), coordinates(x, y)). If rest then value=counts
-        self.clef = None    # 0 if treble else bass if 1
+        self.notes = []             # (value(letter, octave, counts), coordinates(x, y)). If rest then value=counts
+
+        self.clef = None            # 0 if treble else bass if 1
+        self.clef_dim = None        # Dimensions of clef so it can be cropped out
+        self.clef_loc = None        # Location of clef (relative to staff image) so it can be cropped out
+
+        # Signature Annotations
         self.sharps = []
         self.flats = []
-        self.gray_img = None    # Grayscale subimage of d
+
+        self.gray_img = None        # Grayscale subimage of d
         self.binary_img = None
 
     def make_subimage(self, gray_img):
@@ -32,7 +41,7 @@ class Staff:
             staff_top + staff_height + self.vpadding * staff_height),
                       self.lines[0][0]:self.lines[0][-2]]  # Create sub-image of staff
 
-        _, self.binary_img = cv2.threshold(self.gray_img, BINARY_THRESH, 255, cv2.THRESH_BINARY)
+        _, self.binary_img = cv2.threshold(self.gray_img, BINARY_THRESH, 255, cv2.THRESH_OTSU)
 
     # Super sloppy way of determining the note from y coordinate. TODO: Change before final report
     def y_to_note(self, y):
@@ -63,7 +72,7 @@ class Staff:
                           str(self.notes))
 
 
-def detect_staff_lines(binary_img):
+def detect_staffs(binary_img):
     # Thresholds
     MIN_HOUGH_VOTES_FRACTION = 0.7       # threshold = min_hough_votes_fraction * image width
     MIN_LINE_LENGTH_FRACTION = 0.4      # image_width * min_line_length
@@ -134,18 +143,18 @@ def detect_staff_lines(binary_img):
                 break
         num_spacings = i - start_i
 
-        assert num_spacings == 4 or num_spacings == 1, "Staff Lines Detected Incorrectly"
+        # assert num_spacings == 4 or num_spacings == 1, "Staff Lines Detected Incorrectly"
 
         if num_spacings == 4:
             staffs.append(Staff(filtered_lines[start_i:i+1]))
 
-    cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
-    cv2.waitKey(0)
+    # cv2.imshow("Staff image", lines_img)
+    # cv2.waitKey(0)
 
     return staffs
 
 
-def detect_clefs(staffs, annotate=True):
+def detect_clefs(staffs, markup_image):
     tune_start, tune_stop, tune_step = 0.9, 1, 0.02     # Scale tuning variables
 
     # Read in clef templates as gray images
@@ -155,11 +164,13 @@ def detect_clefs(staffs, annotate=True):
     bass_template = cv2.imread(os.path.join(TEMPLATE_DIR, 'bass-clef.jpg'))
     bass_template = cv2.cvtColor(bass_template, cv2.COLOR_BGR2GRAY)
 
-    clef_annotations = []
+    clef_markup = []
     for staff in staffs:
         staff_top = staff.lines[0][1]
 
         detected_clef = None
+        detected_clef_dim = None
+        detected_clef_loc = None
 
         # Try to match each clef template
         for clef_num, template in enumerate((treble_template, bass_template)):
@@ -176,29 +187,38 @@ def detect_clefs(staffs, annotate=True):
 
                 if max_val > CLEF_THRESH:
                     detected_clef = clef_num
-                    clef_annotations.append((detected_clef, (max_loc[0]+scaled_template.shape[0]+staff.lines[0][0]-60, max_loc[1]+staff_top-10)))
+                    detected_clef_dim = scaled_template.shape
+                    detected_clef_loc = max_loc
+
+                    # Write information on markup image
+                    if detected_clef == 0:
+                        clef_name = "Treble"
+                    else:
+                        clef_name = "Bass"
+
+                    text_x = round(max_loc[0]+staff.lines[0][0]-60)
+                    text_y = round(max_loc[1]+staff_top)
+                    markup_image = cv2.putText(markup_image, clef_name, (text_x, text_y),
+                                               cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0, 0, 255))
                     break
 
                 tune += tune_step
 
         assert detected_clef is not None, "Could not detect all clefs"
 
+        # Set staff clef variables
         staff.clef = detected_clef
+        staff.clef_dim = detected_clef_dim
+        staff.clef_loc = detected_clef_loc
 
-    if annotate:
-        return staffs, clef_annotations
-
-    return staffs
+    return staffs, markup_image
 
 
-def detect_notes(staff, annotate=True):
+def detect_notes(staff, markup_image):
     y_fudge = -1
 
     staff_top = staff.lines[0][1]
     staff_height = staff.lines[-1][1] - staff_top
-
-    # Create image to show matches
-    match_image = cv2.cvtColor(np.copy(staff.binary_img), cv2.COLOR_GRAY2BGR)
 
     # Get rid of staff lines
     kernel = np.ones((2, 1), np.uint8)
@@ -207,16 +227,15 @@ def detect_notes(staff, annotate=True):
     templates = [   # (Template Image, Counts)
         (cv2.imread(TEMPLATE_DIR+'/quarter-note.jpg'), 1),
         (cv2.imread(TEMPLATE_DIR+'/half-note.jpg'), 2),
-        (cv2.imread(TEMPLATE_DIR+'/whole-note.jpg'), 4)
+        (cv2.imread(TEMPLATE_DIR+'/whole-note.jpg'), 4),
     ]
 
-    notes_annotations = []  # For drawing an annotated image
     notes = []  # ((x, y), counts)
     for template, counts in templates:
         # Create gray template
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
-        # Scale template
+        # Scale template to be the same height as the line spacing
         scale = (staff_height/4) / template.shape[0]
         scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)
 
@@ -245,64 +264,44 @@ def detect_notes(staff, annotate=True):
 
             letter, octave = staff.y_to_note(cy)
 
-            if annotate:
-                x, y = int(x), int(y)
-                # Draw Rectangle around note
-                # cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 1)
+            x, y = int(x), int(y)
+            # Draw Rectangle around note
+            # cv2.rectangle(match_image, (x, y), (x + scaled_template.shape[1], y + scaled_template.shape[0]), (0, 0, 255), 1)
 
-                font_scale = 0.6
-                # Write note value next to note
-                match_image = cv2.putText(match_image, letter + str(octave),
-                                          (x + scaled_template.shape[1], round(y - scaled_template.shape[0] * 0.2)),
-                                          cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0, 0, 255))
+            text_coord1 = (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y-scaled_template.shape[0]*0.2 + staff_top - Staff.vpadding * staff_height))
+            text_coord2 = (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y+scaled_template.shape[0]*1.5 + staff_top - Staff.vpadding * staff_height))
 
-                # Write number of counts next to note
-                match_image = cv2.putText(match_image, str(counts),
-                                          (x + scaled_template.shape[1], round(y + scaled_template.shape[0] * 1.5)),
-                                          cv2.FONT_HERSHEY_COMPLEX_SMALL, font_scale, (0, 0, 255))
+            markup_image = cv2.putText(markup_image, letter+str(octave), text_coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
+            markup_image = cv2.putText(markup_image, str(counts), text_coord2, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
 
-                notes_annotations.append((letter+str(octave), (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y-scaled_template.shape[0]*0.2)+round(staff_top - Staff.vpadding * staff_height)),
-                                               str(counts), (round(x+scaled_template.shape[1]+staff.lines[0][0]), round(y+scaled_template.shape[0]*1.5)+round(staff_top - Staff.vpadding * staff_height))))
-
-    # if annotate:
-        # cv2.imshow("Matches", match_image)
-        # cv2.waitKey(0)
+    # cv2.imshow("Matches", match_image)
+    # cv2.waitKey(0)
 
     notes = [((*staff.y_to_note(coord[1]), counts), coord)
              for coord, counts in notes]   # Notes defined by (value, coordinates)
     staff.notes += notes
     staff.notes.sort(key=lambda note: note[1][0])     # Sort notes by x value (left to right)
 
-    if annotate:
-        return notes_annotations
+    return markup_image
 
 
 def detect_eighth_notes(staff):
-    MIN_HOUGH_VOTES_FRACTION = 0.5
+    MIN_HOUGH_VOTES_FRACTION = 0.2
     MIN_LINE_LENGTH_FRACTION = 1/80
     EDGE_THRESH = 0.05
 
     staff_image = staff.binary_img
-    # for x1, y1, x2, y2 in staff.lines:
-    #     staff_top = staff.lines[0][1]
-    #     staff_height = staff.lines[-1][1] - staff_top
-    #     y_shift = staff_top - Staff.vpadding * staff_height
-    #     cv2.line(staff_image, (round(x1), round(y1-y_shift)), (round(x2), round(y2-y_shift)), (255,255,255), thickness=2)
-
-    # cv2.imshow("No Staff Lines", staff_image)
-    # cv2.waitKey(0)
-    edge_img = cv2.Canny(staff_image,
-                         apertureSize=3,
-                         threshold1=EDGE_THRESH,
-                         threshold2=EDGE_THRESH*3,
-                         L2gradient=True)
-    cv2.imshow("Edges", edge_img)
-    cv2.waitKey(0)
 
     image_width = staff.binary_img.shape[1]
 
+    for x1, y1, x2, y2 in staff.lines:
+        staff_top = staff.lines[0][1]
+        staff_height = staff.lines[-1][1] - staff_top
+        y_shift = staff_top - Staff.vpadding * staff_height
+        cv2.line(staff_image, (round(x1), round(y1-y_shift)), (round(x2), round(y2-y_shift)), (255,255,255), thickness=2)
+
     lines = cv2.HoughLinesP(
-        image=edge_img,
+        image=255 - staff.binary_img,
         rho=5,
         theta=math.pi / 180,
         threshold=int(image_width * MIN_HOUGH_VOTES_FRACTION),
@@ -317,11 +316,22 @@ def detect_eighth_notes(staff):
             x1, y1, x2, y2 = line[0]
             cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0))
 
+
+
+        staff_top = staff.lines[0][1]
+        staff_height = staff.lines[-1][1] - staff_top
+        note_height = staff_height/4
+
+        for line in lines:
+            for note in staff.notes:
+                if note[1][0] > line[0][0]-note_height-2 and note[1][0] < line[0][0]+note_height+2:
+                    print(note)
+
         cv2.imshow("Note Connectors", lines_img)
         cv2.waitKey(0)
 
 
-def detect_rests(staff, annotate=True):
+def detect_rests(staff, markup_image):
     tune_start, tune_stop, tune_step = 0.9, 1, 0.02     # Scale tuning variables
 
     staff_top = staff.lines[0][1]
@@ -332,17 +342,17 @@ def detect_rests(staff, annotate=True):
         (cv2.imread(TEMPLATE_DIR + '/half-rest.jpg'), 2)
     ]
 
-    rest_annotations = []
+    rest_markup = []
     rests = []
     for template, counts in templates:
         # Create gray template
         template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
 
         # Scale base
-        scale_base = staff.gray_img.shape[0] / template.shape[0]    # Makes template the same height as staff image
+        scale_base = staff.gray_img.shape[0] / (2*template.shape[0])    # Makes template the same height as staff image
 
         # Find best scaling factor for template
-        score_matrices = []    # Max score at each scale
+        score_images = []    # Max score at each scale
         tune = tune_start
         while tune < tune_stop:
             scale = scale_base * tune
@@ -350,10 +360,10 @@ def detect_rests(staff, annotate=True):
             scaled_temp = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template
 
             c = cv2.matchTemplate(staff.gray_img, scaled_temp, cv2.TM_CCOEFF_NORMED)
-            score_matrices.append((scaled_temp, c))
+            score_images.append((scaled_temp, c))
             tune += tune_step
 
-        scaled_template, c = max(score_matrices, key=lambda x: np.amax(x[1]))     # Get score matrix with highest max
+        scaled_template, c = max(score_images, key=lambda x: np.amax(x[1]))     # Get score matrix with highest max
 
         # Get all points at threshold
         _, thresh_img = cv2.threshold(c, thresh=REST_THRESH, maxval=255, type=cv2.THRESH_BINARY)
@@ -368,18 +378,85 @@ def detect_rests(staff, annotate=True):
             rests.append((counts, (cx, cy)))
 
             # Provide annotations of note
-            if annotate:
-                x, y = int(x), int(y)
-                rest_annotations.append(("Rest", (round(x + scaled_template.shape[1] + staff.lines[0][0]),
-                                                                 round(y + scaled_template.shape[0] * 0.4) + round(
-                                                                     staff_top - Staff.vpadding * staff_height)),
-                                          str(counts), (round(x + scaled_template.shape[1] + staff.lines[0][0]),
-                                                        round(y + scaled_template.shape[0] * 0.6) + round(
-                                                            staff_top - Staff.vpadding * staff_height))))
+            text_coord1 = (round(x + scaled_template.shape[1] + staff.lines[0][0]),
+                                                             round(y + scaled_template.shape[0] * 0.4) + round(
+                                                                 staff_top - Staff.vpadding * staff_height))
+            text_coord2 = (round(x + scaled_template.shape[1] + staff.lines[0][0]),
+                                                    round(y + scaled_template.shape[0] * 0.9) + round(
+                                                        staff_top - Staff.vpadding * staff_height))
+            markup_image = cv2.putText(markup_image, "Rest", text_coord1, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
+            markup_image = cv2.putText(markup_image, str(counts), text_coord2, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0,0,255))
 
     staff.notes += rests
     staff.notes.sort(key=lambda note: note[1][0])   # Sort by x (left to right)
 
-    if annotate:
-        return rest_annotations
+    return markup_image
 
+
+def detect_signature_annotations(staff, markup_image):
+    tune_start, tune_stop, tune_step = 0.8, 1.2, 0.02  # Variables for scale tunes
+
+    # Staff dimensions
+    staff_top = staff.lines[0][1]
+    staff_height = staff.lines[-1][1] - staff_top
+    staff_line_spacing = staff_height/4
+
+    templates = [
+        (cv2.imread(TEMPLATE_DIR + '/sharp.jpg'), 0),
+        (cv2.imread(TEMPLATE_DIR + '/flat.jpg'), 1),
+    ]
+
+    # Get rid of staff lines
+    kernel = np.ones((2, 1), np.uint8)
+    staff_image = cv2.morphologyEx(staff.gray_img, cv2.MORPH_CLOSE, kernel)
+
+    # Make subimage of just staff signatures
+    signature_image = staff_image[:, staff.clef_loc[0]+staff.clef_dim[1]:staff.clef_loc[0]+2*staff.clef_dim[1]]
+
+    for template, annotation_num in templates:
+        # Create gray template
+        template = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+
+        # Scale base
+        scale_base = 2.25*staff_line_spacing / template.shape[0]    # Makes template the same height as staff image
+
+        # Find best scaling factor for template
+        scores_images = []    # Max score at each scale
+        tune = tune_start
+        while tune < tune_stop:
+            scale = scale_base * tune
+
+            scaled_temp = cv2.resize(template, dsize=None, fx=scale, fy=scale)  # Scale template
+
+            c = cv2.matchTemplate(signature_image, scaled_temp, cv2.TM_CCOEFF_NORMED)
+            scores_images.append((scaled_temp, c))
+            tune += tune_step
+
+        scaled_template, c = max(scores_images, key=lambda x: np.amax(x[1]))    # Get score matrix with highest max val
+
+        # Get all points at threshold
+        _, thresh_img = cv2.threshold(c, thresh=ANNOTATION_THRESH, maxval=255, type=cv2.THRESH_BINARY)
+        thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
+
+        _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)   # Get centroids of connected components
+
+        for x, y in centroids[1::]:
+            # Get annotations location
+            cx = x + scaled_template.shape[1]/2
+            cy = y + scaled_template.shape[0]/2 + int(staff_top - Staff.vpadding * staff_height)
+
+            # Find the note letter corresponding to that y value
+            letter = staff.y_to_note(cy)[0]
+
+            if annotation_num == 0:
+                staff.sharps.append(letter)  # Add letter to staffs sharps list
+                annotation = letter+"# sig"
+            else:
+                staff.flats.append(letter)  # Add letter to staffs flats list
+                annotation = letter+"# sig"
+
+            # Write annotation information on markup image
+            text_coord = (round(cx+scaled_template.shape[1]+staff.lines[0][0]+signature_image.shape[1]), round(y-scaled_template.shape[0]*0.2 + staff_top - Staff.vpadding * staff_height))
+            cv2.putText(markup_image, annotation, text_coord, cv2.FONT_HERSHEY_COMPLEX_SMALL, MARKUP_FONT_SIZE, (0, 0, 255))
+
+    return markup_image
