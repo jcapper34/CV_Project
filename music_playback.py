@@ -6,8 +6,9 @@ import numpy as np
 import simpleaudio as sa
 import wave
 
+
 SAMPLE_RATE = 44100
-COUNT_DURATION = 0.4     # Duration of quarter note (sec)
+COUNT_DURATION = 0.4                # Duration of quarter note (sec)
 BETWEEN_NOTE_REST = 0.01            # Pause time between notes (sec)
 
 NOTE_FREQUENCIES = {
@@ -26,6 +27,7 @@ NOTE_FREQUENCIES = {
 }
 
 
+# Find frequency of note
 def get_frequency(letter, octave, accidental):
     letter = letter.upper()
     if accidental == '#':
@@ -39,6 +41,7 @@ def get_frequency(letter, octave, accidental):
     return NOTE_FREQUENCIES[letter][octave]
 
 
+# Plays back a list of staff notes
 # Assumes that staffs are grouped in pairs
 def play_sheet(staffs, group=2):
     audio_buffer = np.array([])
@@ -114,6 +117,8 @@ def play_sheet(staffs, group=2):
 
 
 # Needs to be edited to use annotations
+
+# Creates an audio buffer for a list of notes
 def create_notes_buffer(notes, play=False):
     audio_buffer = np.array([])
     for value, _ in notes:
