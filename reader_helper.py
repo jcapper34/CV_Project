@@ -1,5 +1,3 @@
-
-from pprint import pprint
 import math
 import cv2
 import os
@@ -146,18 +144,21 @@ def detect_staffs(binary_img):
     i = 0
     while i < len(filtered_lines)-1:
         start_i = i
-        spacing = round(filtered_lines[i+1][1] - filtered_lines[i][1])
-        while filtered_lines[i+1][1] - filtered_lines[i][1] in range(int(spacing*(1-LINE_SPACE_VARIATION)), int(spacing*(1+LINE_SPACE_VARIATION))): # If spacing is about equal
+        ref_spacing = round(filtered_lines[i+1][1] - filtered_lines[i][1])  # Spacing between adjacent lines
+
+        # While the next spacings are within LINE_SPACE_VARIATION of the reference spacing
+        while filtered_lines[i+1][1] - filtered_lines[i][1] in range(int(ref_spacing*(1-LINE_SPACE_VARIATION)), int(ref_spacing*(1+LINE_SPACE_VARIATION))): # If spacing is about equal
             i += 1
             if i+1 >= len(filtered_lines):
                 break
         num_spacings = i - start_i
 
+        # If five consecutive lines have similar spacings
         if num_spacings == 4:
             staffs.append(Staff(filtered_lines[start_i:i+1]))
 
-    # cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
-    # cv2.waitKey(0)
+    cv2.imshow("Staff image", cv2.hconcat([binary_img, lines_img]))
+    cv2.waitKey(0)
     return staffs
 
 
@@ -254,6 +255,7 @@ def detect_notes(staff, markup_image):
         scale = (staff_height/4) / template.shape[0]
         scaled_template = cv2.resize(template, dsize=None, fx=scale, fy=scale)
 
+        # Match template on to staff image
         c = cv2.matchTemplate(staff_image, scaled_template, cv2.TM_CCOEFF_NORMED)
 
         # Get all points at threshold
@@ -267,6 +269,7 @@ def detect_notes(staff, markup_image):
         # cv2.imshow("Thresh", thresh_img)
         # cv2.waitKey(0)
 
+        # Find centroids of connected components
         _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)
 
         for x, y in centroids[1::]:
@@ -302,50 +305,6 @@ def detect_notes(staff, markup_image):
 
     return markup_image
 
-
-# def detect_eighth_notes(staff):
-#     MIN_HOUGH_VOTES_FRACTION = 0.2
-#     MIN_LINE_LENGTH_FRACTION = 1/80
-#     EDGE_THRESH = 0.05
-#
-#     staff_image = staff.binary_img
-#
-#     image_width = staff.binary_img.shape[1]
-#
-#     for x1, y1, x2, y2 in staff.lines:
-#         staff_top = staff.lines[0][1]
-#         staff_height = staff.lines[-1][1] - staff_top
-#         y_shift = staff_top - Staff.vpadding * staff_height
-#         cv2.line(staff_image, (round(x1), round(y1-y_shift)), (round(x2), round(y2-y_shift)), (255,255,255), thickness=2)
-#
-#     lines = cv2.HoughLinesP(
-#         image=255 - staff.binary_img,
-#         rho=5,
-#         theta=math.pi / 180,
-#         threshold=int(image_width * MIN_HOUGH_VOTES_FRACTION),
-#         lines=None,
-#         minLineLength=int(image_width * MIN_LINE_LENGTH_FRACTION),
-#         maxLineGap=30)
-#
-#     if lines is not None:
-#         lines_img = np.full(staff.binary_img.shape, 255, np.uint8)
-#
-#         # Draw Staff Lines
-#         for line in lines:
-#             x1, y1, x2, y2 = line[0]
-#             cv2.line(lines_img, (x1, y1), (x2, y2), (0, 0, 0))
-#
-#         staff_top = staff.lines[0][1]
-#         staff_height = staff.lines[-1][1] - staff_top
-#         note_height = staff_height/4
-#
-#         for line in lines:
-#             for note in staff.notes:
-#                 if note[1][0] > line[0][0]-note_height-2 and note[1][0] < line[0][0]+note_height+2:
-#                     print(note)
-#
-#         cv2.imshow("Note Connectors", lines_img)
-#         cv2.waitKey(0)
 
 # Finds the rests and their values in a staff. Adds to the notes list of the staff and returns a marked up image
 def detect_rests(staff, markup_image):
@@ -385,6 +344,11 @@ def detect_rests(staff, markup_image):
         # Get all points at threshold
         _, thresh_img = cv2.threshold(c, thresh=REST_THRESH, maxval=255, type=cv2.THRESH_BINARY)
         thresh_img = np.array(thresh_img, dtype=np.uint8)  # Make sure type is correct
+
+        # Close rest blobs
+        temp_w = scaled_template.shape[1]
+        kernel = np.ones((temp_w, temp_w), np.uint8)
+        thresh_img = cv2.morphologyEx(thresh_img, cv2.MORPH_CLOSE, kernel)
 
         _, _, _, centroids = cv2.connectedComponentsWithStats(thresh_img)   # Get centroids of connected components
 

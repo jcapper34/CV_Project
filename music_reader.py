@@ -14,8 +14,7 @@ def music_reader(filename):
     bgr_img = cv2.imread(filename)
 
     gray_img = cv2.cvtColor(bgr_img, cv2.COLOR_BGR2GRAY)
-    _, binary_img = cv2.threshold(gray_img, BINARY_THRESH, 255, type=cv2.THRESH_BINARY)  # TODO: could adjust threshold, maybe figure out dynamic threshold approach
-
+    _, binary_img = cv2.threshold(gray_img, BINARY_THRESH, 255, type=cv2.THRESH_BINARY)
 
     # Make staffs and their subimages
     staffs = detect_staffs(binary_img)
@@ -23,13 +22,12 @@ def music_reader(filename):
         staff.make_subimage(gray_img)
 
     markup_image = cv2.cvtColor(binary_img, cv2.COLOR_GRAY2BGR)
-    staffs, markup_image = detect_clefs(staffs, markup_image)
+    staffs, markup_image = detect_clefs(staffs, markup_image)   # Detect clefs on each staff
 
     for staff in staffs:
-        markup_image = detect_signature_accidentals(staff, markup_image)
-        markup_image = detect_notes(staff, markup_image)
-        markup_image = detect_rests(staff, markup_image)
-
+        markup_image = detect_signature_accidentals(staff, markup_image)    # Detect sharps, flats
+        markup_image = detect_notes(staff, markup_image)                    # Detect notes in staff
+        markup_image = detect_rests(staff, markup_image)                    # Detect rests in staff
 
     cv2.imshow("Annotated Image", markup_image)
     cv2.waitKey(0)
@@ -43,6 +41,5 @@ def music_reader(filename):
 
 if __name__ == '__main__':
     filename = os.path.join(MEDIA_DIR, input("Please enter a filename: "))
-    # filename = os.path.join(MEDIA_DIR, 'canon-in-d.jpg')
 
     music_reader(filename)
