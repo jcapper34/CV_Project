@@ -1,8 +1,15 @@
 # Sheet Music Reader
 Final Project for CSCI437
 
+## Collaborators
+- John Capper
+- Derek Barker
+- Devin Buzzetta
+- Amira Ramirez-Gonzalez
+
 ## Structure
 - *music_reader.py* is the main file of the program.
+- *reader_helper.py" contains helper functions for reading
 - *music_playback.py* is used to play the audio of the sheet music
 - Images of sheet music are stored in the *music-img* folder.
 
