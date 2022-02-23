@@ -1,5 +1,6 @@
 # Sheet Music Reader
 Final Project for CSCI437
+See https://www.youtube.com/watch?v=hJzZnetRVSg for demonstration
 
 ## Collaborators
 - John Capper
